@@ -1,0 +1,43 @@
+force-file-write: true
+
+packages:
+  github.com/denisdubovitskiy/vpnconfig/internal/happ:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      Doer:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/http:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      RoundTripper:
+      UserAgentGenerator:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/ipserv:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      Doer:
+      IPLookup:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/useragent:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      Rand:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/vpnurl:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      SchemeParser:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/updater:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      LinkFetcher:
+      GeoIPService:
+      VPNParser:
+      ConfigStore:
