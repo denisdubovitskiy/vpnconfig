@@ -1,0 +1,123 @@
+{
+  "log": {
+    "level": "info"
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "dns-local",
+        "address": "127.0.0.1",
+        "detour": "direct-out"
+      },
+      {
+        "tag": "dns-remote",
+        "address": "tls://1.1.1.1",
+        "detour": "proxy-out"
+      },
+      {
+        "tag": "dns-block",
+        "address": "rcode://success"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "type": "tproxy",
+      "tag": "tproxy-in",
+      "listen": "0.0.0.0",
+      "listen_port": 12345
+    },
+    {
+      "type": "direct",
+      "tag": "dns-in"
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct-out"
+    },
+    {
+      "type": "direct",
+      "tag": "VGRU-out"
+    },
+    {
+      "type": "vless",
+      "tag": "MULTI_WEST-1-out",
+      "server": "10.0.0.1",
+      "server_port": 443,
+      "uuid": "stale-uuid-1",
+      "flow": "xtls-rprx-vision"
+    },
+    {
+      "type": "vless",
+      "tag": "MULTI_WEST-2-out",
+      "server": "10.0.0.2",
+      "server_port": 443,
+      "uuid": "stale-uuid-2",
+      "flow": "xtls-rprx-vision"
+    },
+    {
+      "type": "urltest",
+      "tag": "MULTI_WEST-urltest-out",
+      "outbounds": ["MULTI_WEST-1-out", "MULTI_WEST-2-out"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "3m",
+      "tolerance": 50
+    },
+    {
+      "type": "selector",
+      "tag": "MULTI_WEST-out",
+      "outbounds": ["MULTI_WEST-1-out", "MULTI_WEST-2-out", "MULTI_WEST-urltest-out"],
+      "default": "MULTI_WEST-urltest-out"
+    },
+    {
+      "type": "vless",
+      "tag": "MULTI_RU-1-out",
+      "server": "10.0.1.1",
+      "server_port": 443,
+      "uuid": "stale-uuid-3",
+      "flow": "xtls-rprx-vision"
+    },
+    {
+      "type": "urltest",
+      "tag": "MULTI_RU-urltest-out",
+      "outbounds": ["MULTI_RU-1-out"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "3m",
+      "tolerance": 50
+    },
+    {
+      "type": "selector",
+      "tag": "MULTI_RU-out",
+      "outbounds": ["MULTI_RU-1-out", "MULTI_RU-urltest-out"],
+      "default": "MULTI_RU-urltest-out"
+    }
+  ],
+  "route": {
+    "final": "direct-out",
+    "rule_set": [
+      {"type": "local", "tag": "VGRU-user-domains-ruleset", "format": "source", "path": "rulesets/vgru-user-domains.srs"},
+      {"type": "remote", "tag": "MULTI_WEST-geoblock-community-ruleset", "format": "binary", "url": "https://example.com/geoblock.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-block-community-ruleset", "format": "binary", "url": "https://example.com/block.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-youtube-community-ruleset", "format": "binary", "url": "https://example.com/youtube.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-meta-community-ruleset", "format": "binary", "url": "https://example.com/meta.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-twitter-community-ruleset", "format": "binary", "url": "https://example.com/twitter.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-telegram-community-ruleset", "format": "binary", "url": "https://example.com/telegram.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-cloudflare-community-ruleset", "format": "binary", "url": "https://example.com/cloudflare.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-google_ai-community-ruleset", "format": "binary", "url": "https://example.com/google_ai.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-google_play-community-ruleset", "format": "binary", "url": "https://example.com/google_play.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-cloudfront-community-ruleset", "format": "binary", "url": "https://example.com/cloudfront.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-hetzner-community-ruleset", "format": "binary", "url": "https://example.com/hetzner.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "remote", "tag": "MULTI_WEST-digitalocean-community-ruleset", "format": "binary", "url": "https://example.com/digitalocean.srs", "download_detour": "direct-out", "update_interval": "1d"},
+      {"type": "local", "tag": "MULTI_WEST-user-domains-ruleset", "format": "source", "path": "rulesets/multi_west-user-domains.srs"},
+      {"type": "remote", "tag": "MULTI_RU-youtube-community-ruleset", "format": "binary", "url": "https://example.com/youtube-ru.srs", "download_detour": "direct-out", "update_interval": "1d"}
+    ]
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "path": "cache.db"
+    }
+  }
+}

@@ -83,6 +83,61 @@ func TestVlessParser_Parse(t *testing.T) {
 		require.True(t, ok)
 		assert.Empty(t, vless.Flow)
 	})
+
+	// Проверяем парсинг network параметра.
+	t.Run("vless with network", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		url := "vless://uuid@192.0.2.1:8444?security=tls&network=udp"
+
+		// act
+		outbound, err := parser.Parse(url)
+
+		// assert
+		require.NoError(t, err)
+
+		vless, ok := outbound.(*VLESSOutbound)
+		require.True(t, ok)
+		assert.Equal(t, "udp", vless.Network)
+	})
+
+	// Проверяем что type=tcp не создаёт transport.
+	t.Run("vless tcp without transport", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		url := "vless://uuid@192.0.2.1:8444?security=tls&type=tcp"
+
+		// act
+		outbound, err := parser.Parse(url)
+
+		// assert
+		require.NoError(t, err)
+
+		vless, ok := outbound.(*VLESSOutbound)
+		require.True(t, ok)
+		assert.Nil(t, vless.Transport)
+	})
+
+	// Проверяем парсинг host для transport.
+	t.Run("vless with host", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		url := "vless://uuid@192.0.2.1:8444?security=tls&type=ws&host=cdn.example.com"
+
+		// act
+		outbound, err := parser.Parse(url)
+
+		// assert
+		require.NoError(t, err)
+
+		vless, ok := outbound.(*VLESSOutbound)
+		require.True(t, ok)
+		require.NotNil(t, vless.Transport)
+		assert.Equal(t, "cdn.example.com", vless.Transport.Host)
+	})
 }
 
 func TestTrojanParser_Parse(t *testing.T) {
@@ -134,6 +189,61 @@ func TestTrojanParser_Parse(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, trojan.TLS)
 		assert.True(t, trojan.TLS.Enabled)
+	})
+
+	// Проверяем что type=tcp не создаёт transport для trojan.
+	t.Run("trojan tcp without transport", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		url := "trojan://password@example.com:443?type=tcp"
+
+		// act
+		outbound, err := parser.Parse(url)
+
+		// assert
+		require.NoError(t, err)
+
+		trojan, ok := outbound.(*TrojanOutbound)
+		require.True(t, ok)
+		assert.Nil(t, trojan.Transport)
+	})
+
+	// Проверяем парсинг network параметра для trojan.
+	t.Run("trojan with network", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		url := "trojan://password@example.com:443?network=udp"
+
+		// act
+		outbound, err := parser.Parse(url)
+
+		// assert
+		require.NoError(t, err)
+
+		trojan, ok := outbound.(*TrojanOutbound)
+		require.True(t, ok)
+		assert.Equal(t, "udp", trojan.Network)
+	})
+
+	// Проверяем парсинг host для transport.
+	t.Run("trojan with host", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		url := "trojan://password@example.com:443?type=ws&host=cdn.example.com"
+
+		// act
+		outbound, err := parser.Parse(url)
+
+		// assert
+		require.NoError(t, err)
+
+		trojan, ok := outbound.(*TrojanOutbound)
+		require.True(t, ok)
+		require.NotNil(t, trojan.Transport)
+		assert.Equal(t, "cdn.example.com", trojan.Transport.Host)
 	})
 }
 

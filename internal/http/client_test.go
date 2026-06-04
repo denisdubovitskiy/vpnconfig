@@ -204,7 +204,7 @@ func TestUserAgentTransport_RoundTrip(t *testing.T) {
 				nil,
 			)
 
-		req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://example.com", http.NoBody)
 		require.NoError(t, err)
 		req.Header.Set("User-Agent", originalUA)
 

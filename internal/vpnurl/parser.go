@@ -85,4 +85,5 @@ type TransportConfig struct {
 	Type        string `json:"type,omitempty"`
 	ServiceName string `json:"service_name,omitempty"`
 	Path        string `json:"path,omitempty"`
+	Host        string `json:"host,omitempty"`
 }

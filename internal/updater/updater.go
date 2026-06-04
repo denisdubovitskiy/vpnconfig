@@ -1,9 +1,10 @@
 package updater
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/url"
 	"os"
@@ -14,14 +15,21 @@ import (
 	"time"
 
 	"github.com/denisdubovitskiy/vpnconfig/internal/config"
+	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
+	"github.com/denisdubovitskiy/vpnconfig/internal/profile"
+	"github.com/denisdubovitskiy/vpnconfig/internal/resolver"
 	"github.com/denisdubovitskiy/vpnconfig/internal/singbox"
 	"github.com/denisdubovitskiy/vpnconfig/internal/vpnurl"
 )
 
-// LinkFetcher получает список VPN-ссылок.
-type LinkFetcher interface {
-	FetchLinks(ctx context.Context, url string) ([]string, error)
-}
+// LinkFetcher получает список VPN-ссылок. Алиас для profile.LinkFetcher,
+// чтобы updater мог принимать мапу с любыми реализациями профилей без
+// дополнительных адаптеров.
+type LinkFetcher = profile.LinkFetcher
+
+// DNSResolver резолвит доменное имя в список IP-адресов. Алиас для
+// resolver.IPResolver — единый интерфейс для всех DNS-резолверов.
+type DNSResolver = resolver.IPResolver
 
 // GeoIPService определяет страну по IP-адресу.
 type GeoIPService interface {
@@ -40,29 +48,40 @@ type ConfigStore interface {
 	CreateBackup(configPath string) (string, error)
 }
 
+// ConfigValidator проверяет валидность конфигурации sing-box.
+type ConfigValidator interface {
+	CheckConfig(ctx context.Context, configPath string) error
+}
+
 // Updater обновляет sing-box конфигурацию на основе VPN-ссылок.
+// Логгер передаётся через context.Context (см. logger.IntoContext /
+// logger.FromContext) — отдельной зависимости или поля в структуре нет.
 type Updater struct {
-	fetcher     LinkFetcher
+	fetchers    map[config.SourceType]LinkFetcher
+	dns         DNSResolver
 	geoIP       GeoIPService
 	parser      VPNParser
 	configStore ConfigStore
-	logger      *slog.Logger
+	validator   ConfigValidator
 }
 
-// NewUpdater создаёт новый Updater.
+// NewUpdater создаёт новый Updater. Логгер должен быть передан через
+// context.Context при вызове Run (см. logger.IntoContext).
 func NewUpdater(
-	fetcher LinkFetcher,
+	fetchers map[config.SourceType]LinkFetcher,
+	dns DNSResolver,
 	geoIP GeoIPService,
 	parser VPNParser,
 	configStore ConfigStore,
-	logger *slog.Logger,
+	validator ConfigValidator,
 ) *Updater {
 	return &Updater{
-		fetcher:     fetcher,
+		fetchers:    fetchers,
+		dns:         dns,
 		geoIP:       geoIP,
 		parser:      parser,
 		configStore: configStore,
-		logger:      logger,
+		validator:   validator,
 	}
 }
 
@@ -73,85 +92,174 @@ type Result struct {
 	CountriesFound  map[string]int
 	SectionsUpdated []string
 	BackupPath      string
+	Changed         bool
 }
 
 // Run выполняет полный цикл обновления конфигурации.
+// Логгер берётся из ctx через logger.FromContext; в ctx он должен быть
+// помещён вызывающим кодом (см. logger.IntoContext).
 func (u *Updater) Run(ctx context.Context, cfg *config.Config) (*Result, error) {
-	links, err := u.fetcher.FetchLinks(ctx, cfg.HappURL)
-	if err != nil {
-		return nil, fmt.Errorf("fetch links: %w", err)
-	}
+	log := logger.FromContext(ctx)
 
-	u.logger.Info("parsing urls and looking up countries", "count", len(links))
+	log.Info("starting update cycle",
+		"cache_path", cfg.CachePath,
+		"singbox_config", cfg.SingboxConfig,
+		"sections_count", len(cfg.Sections),
+	)
 
 	countryURLs := make(map[string][]string)
 	parsedOutbounds := make(map[string]singbox.Outbound)
+	totalLinks := 0
+	skipped := 0
 
-	for _, l := range links {
-		ip, err := parseIPFromVpnURL(l)
-		if err != nil {
-			u.logger.Error("skipping url due to an error", "err", err.Error())
-			continue
+	for _, section := range cfg.Sections {
+		for _, source := range section.Sources {
+			fetcher, ok := u.fetchers[source.Type]
+			if !ok {
+				log.Warn("unknown source type, skipping",
+					"section", section.Name,
+					"type", string(source.Type),
+				)
+				continue
+			}
+
+			for _, sourceURL := range source.URLs {
+				log.Info("fetching links from source",
+					"section", section.Name,
+					"type", string(source.Type),
+					"url", sourceURL,
+				)
+
+				links, err := fetcher.FetchLinks(ctx, sourceURL)
+				if err != nil {
+					log.Warn("failed to fetch links from source",
+						"section", section.Name,
+						"type", string(source.Type),
+						"url", sourceURL,
+						"reason", err.Error(),
+					)
+					continue
+				}
+
+				totalLinks += len(links)
+
+				for _, l := range links {
+					ip, err := parseIPFromVpnURL(ctx, u.dns, l)
+					if err != nil {
+						log.Warn("skipping url: failed to extract IP",
+							"url", truncateURL(l),
+							"reason", err.Error(),
+						)
+						skipped++
+						continue
+					}
+
+					country, err := u.geoIP.CountryName(ctx, ip)
+					if err != nil {
+						log.Warn("skipping url: geoip lookup failed",
+							"url", truncateURL(l),
+							"ip", ip,
+							"reason", err.Error(),
+						)
+						skipped++
+						continue
+					}
+
+					parsed, err := u.parser.Parse(l)
+					if err != nil {
+						log.Warn("skipping url: parser failed",
+							"url", truncateURL(l),
+							"ip", ip,
+							"country", country,
+							"reason", err.Error(),
+						)
+						skipped++
+						continue
+					}
+
+					outbound, err := singbox.ConvertFromSingBoxOutbound(parsed.ToOutbound())
+					if err != nil {
+						log.Warn("skipping url: conversion failed",
+							"url", truncateURL(l),
+							"ip", ip,
+							"country", country,
+							"reason", err.Error(),
+						)
+						skipped++
+						continue
+					}
+
+					log.Info("parsed url successfully",
+						"ip", ip,
+						"country", country,
+						"type", parsed.Type(),
+					)
+
+					countryURLs[country] = append(countryURLs[country], l)
+					parsedOutbounds[l] = outbound
+				}
+			}
 		}
-
-		country, err := u.geoIP.CountryName(ctx, ip)
-		if err != nil {
-			u.logger.Error("skipping url due to country parse error", "err", err.Error())
-			continue
-		}
-
-		u.logger.Info("country name parsed", "country_name", country, "ip", ip)
-
-		parsed, err := u.parser.Parse(l)
-		if err != nil {
-			u.logger.Error("skipping url due to parse error", "err", err.Error())
-			continue
-		}
-
-		outbound, err := singbox.ConvertFromSingBoxOutbound(parsed.ToOutbound())
-		if err != nil {
-			u.logger.Error("skipping url due to convert error", "err", err.Error())
-			continue
-		}
-
-		countryURLs[country] = append(countryURLs[country], l)
-		parsedOutbounds[l] = outbound
 	}
+
+	if skipped > 0 {
+		log.Info("url processing summary",
+			"total", totalLinks,
+			"successful", len(parsedOutbounds),
+			"skipped", skipped,
+		)
+	}
+
+	// Одна и та же ссылка может встретиться в нескольких секциях/источниках,
+	// поэтому дедуплицируем countryURLs — иначе outbounds в sing-box конфиге
+	// будут дублироваться.
+	deduplicateCountryURLs(countryURLs)
+
+	u.logCountriesSummary(ctx, countryURLs)
 
 	singboxCfg, err := u.configStore.LoadConfig(cfg.SingboxConfig)
 	if err != nil {
 		return nil, fmt.Errorf("load singbox config: %w", err)
 	}
 
-	if err := u.cleanupCacheIfNeeded(cfg.CachePath, cfg.MaxCacheSizeBytes); err != nil {
-		u.logger.Warn("failed to cleanup cache", "error", err.Error())
-	}
-
-	backupPath, err := u.createBackup(cfg.SingboxConfig, cfg.BackupDir)
+	oldOutbounds, err := singboxCfg.CloneOutbounds()
 	if err != nil {
-		return nil, fmt.Errorf("create backup: %w", err)
+		return nil, fmt.Errorf("clone outbounds: %w", err)
 	}
-	u.logger.Info("backup created", "path", backupPath)
 
-	if cfg.MaxBackups > 0 {
-		if err := u.cleanupOldBackups(cfg.BackupDir, cfg.MaxBackups); err != nil {
-			u.logger.Warn("failed to cleanup old backups", "error", err.Error())
-		}
-	}
+	log.Info("loaded sing-box config",
+		"path", cfg.SingboxConfig,
+		"outbounds_count", len(singboxCfg.Outbounds),
+	)
 
 	var sectionsUpdated []string
 	for _, section := range cfg.Sections {
-		u.logger.Info("updating section", "section", section.Name)
+		log.Info("processing section",
+			"section", section.Name,
+			"allowed_countries", section.Countries,
+		)
 
 		sectionOutbounds := u.buildSectionOutbounds(section, countryURLs, parsedOutbounds)
 		if len(sectionOutbounds) == 0 {
-			u.logger.Warn("no outbounds found for section, skipping", "section", section.Name)
+			log.Warn("section has no matching outbounds, skipping",
+				"section", section.Name,
+				"reason", "no servers from allowed countries were found",
+			)
 			continue
 		}
 
-		u.logger.Info("found outbounds for section", "section", section.Name, "count", len(sectionOutbounds))
+		log.Info("building section outbounds",
+			"section", section.Name,
+			"proxy_count", len(sectionOutbounds),
+		)
 
-		singboxCfg.RemoveSectionOutbounds(section.Name)
+		removed := singboxCfg.RemoveSectionOutbounds(section.Name)
+		if removed > 0 {
+			log.Info("removed old section outbounds",
+				"section", section.Name,
+				"removed_count", removed,
+			)
+		}
 
 		urltestURL, urltestInterval, urltestTolerance := u.resolveURLTestSettings(cfg, section)
 		newOutbounds := singbox.GenerateSectionOutbounds(
@@ -164,26 +272,114 @@ func (u *Updater) Run(ctx context.Context, cfg *config.Config) (*Result, error) 
 
 		singboxCfg.AddOutbounds(newOutbounds)
 		sectionsUpdated = append(sectionsUpdated, section.Name)
-	}
 
-	if err := u.configStore.SaveConfig(cfg.SingboxConfig, singboxCfg); err != nil {
-		return nil, fmt.Errorf("save singbox config: %w", err)
+		log.Info("section updated",
+			"section", section.Name,
+			"added_proxies", len(sectionOutbounds),
+			"total_outbounds", len(singboxCfg.Outbounds),
+		)
 	}
-
-	u.logger.Info("singbox config updated successfully")
 
 	countriesFound := make(map[string]int)
 	for country, urls := range countryURLs {
 		countriesFound[country] = len(urls)
 	}
 
+	// Сравниваем outbounds через JSON-представление, а не через reflect.DeepEqual.
+	// reflect.DeepEqual чувствителен к Go-типам значений: int(50) != float64(50),
+	// хотя JSON-сериализация идентична. После клонирования через CloneOutbounds
+	// (json.Marshal + json.Unmarshal) все числа становятся float64, а
+	// сгенерированные через NewURLTestOutbound outbounds содержат int в поле
+	// tolerance. Без JSON-сравнения это приводит к ложноположительным
+	// "changes detected" при повторных запусках с теми же данными.
+	if outboundsEqual(oldOutbounds, singboxCfg.Outbounds) {
+		log.Info("no changes detected in sing-box config, skipping save",
+			"reason", "outbounds are identical to previous state",
+		)
+		return &Result{
+			LinksFetched:    totalLinks,
+			URLsParsed:      len(parsedOutbounds),
+			CountriesFound:  countriesFound,
+			SectionsUpdated: sectionsUpdated,
+			Changed:         false,
+		}, nil
+	}
+
+	log.Info("changes detected in sing-box config",
+		"old_outbound_count", len(oldOutbounds),
+		"new_outbound_count", len(singboxCfg.Outbounds),
+		"sections_updated", sectionsUpdated,
+	)
+
+	if err := u.cleanupCacheIfNeeded(ctx, cfg.CachePath, cfg.MaxCacheSizeBytes); err != nil {
+		log.Warn("cache cleanup failed", "error", err.Error())
+	}
+
+	backupPath, err := u.createBackup(cfg.SingboxConfig, cfg.BackupDir)
+	if err != nil {
+		return nil, fmt.Errorf("create backup: %w", err)
+	}
+	log.Info("backup created", "path", backupPath)
+
+	if cfg.MaxBackups > 0 {
+		if err := u.cleanupOldBackups(ctx, cfg.BackupDir, cfg.MaxBackups); err != nil {
+			log.Warn("old backup cleanup failed", "error", err.Error())
+		}
+	}
+
+	if err := u.saveConfigWithValidation(ctx, cfg.SingboxConfig, singboxCfg); err != nil {
+		return nil, fmt.Errorf("save singbox config: %w", err)
+	}
+
+	log.Info("sing-box config saved", "path", cfg.SingboxConfig)
+
 	return &Result{
-		LinksFetched:    len(links),
+		LinksFetched:    totalLinks,
 		URLsParsed:      len(parsedOutbounds),
 		CountriesFound:  countriesFound,
 		SectionsUpdated: sectionsUpdated,
 		BackupPath:      backupPath,
+		Changed:         true,
 	}, nil
+}
+
+// deduplicateCountryURLs удаляет повторяющиеся URL внутри каждой страны.
+// Сохраняет порядок первого вхождения.
+func deduplicateCountryURLs(countryURLs map[string][]string) {
+	for country, urls := range countryURLs {
+		seen := make(map[string]struct{}, len(urls))
+		unique := make([]string, 0, len(urls))
+		for _, u := range urls {
+			if _, ok := seen[u]; ok {
+				continue
+			}
+			seen[u] = struct{}{}
+			unique = append(unique, u)
+		}
+		countryURLs[country] = unique
+	}
+}
+
+func (u *Updater) logCountriesSummary(ctx context.Context, countryURLs map[string][]string) {
+	log := logger.FromContext(ctx)
+
+	if len(countryURLs) == 0 {
+		log.Warn("no valid countries found in any URLs")
+		return
+	}
+
+	countries := make([]string, 0, len(countryURLs))
+	for c := range countryURLs {
+		countries = append(countries, c)
+	}
+	slices.Sort(countries)
+
+	for _, country := range countries {
+		log.Info("country summary",
+			"country", country,
+			"urls", len(countryURLs[country]),
+		)
+	}
 }
 
 func (u *Updater) buildSectionOutbounds(
@@ -191,12 +387,18 @@ func (u *Updater) buildSectionOutbounds(
 	countryURLs map[string][]string,
 	parsedOutbounds map[string]singbox.Outbound,
 ) []singbox.Outbound {
+	countries := make([]string, 0, len(countryURLs))
+	for country := range countryURLs {
+		countries = append(countries, country)
+	}
+	slices.Sort(countries)
+
 	var result []singbox.Outbound
-	for country, urls := range countryURLs {
+	for _, country := range countries {
 		if !slices.Contains(section.Countries, country) {
 			continue
 		}
-		for _, url := range urls {
+		for _, url := range countryURLs[country] {
 			if ob, ok := parsedOutbounds[url]; ok {
 				result = append(result, ob)
 			}
@@ -228,7 +430,7 @@ func (u *Updater) resolveURLTestSettings(
 	return urltestURL, urltestInterval, urltestTolerance
 }
 
-func (u *Updater) cleanupCacheIfNeeded(cachePath string, maxSizeBytes int64) error {
+func (u *Updater) cleanupCacheIfNeeded(ctx context.Context, cachePath string, maxSizeBytes int64) error {
 	if maxSizeBytes <= 0 || cachePath == "" {
 		return nil
 	}
@@ -245,7 +447,11 @@ func (u *Updater) cleanupCacheIfNeeded(cachePath string, maxSizeBytes int64) err
 		if err := os.WriteFile(cachePath, []byte("{}"), 0o644); err != nil {
 			return fmt.Errorf("clear cache file: %w", err)
 		}
-		u.logger.Info("cache cleared due to size limit", "path", cachePath, "size", info.Size(), "limit", maxSizeBytes)
+		logger.FromContext(ctx).Info("cache cleared due to size limit",
+			"path", cachePath,
+			"size_bytes", info.Size(),
+			"limit_bytes", maxSizeBytes,
+		)
 	}
 
 	return nil
@@ -275,7 +481,7 @@ func (u *Updater) createBackup(configPath, backupDir string) (string, error) {
 	return backupPath, nil
 }
 
-func (u *Updater) cleanupOldBackups(backupDir string, maxBackups int) error {
+func (u *Updater) cleanupOldBackups(ctx context.Context, backupDir string, maxBackups int) error {
 	if backupDir == "" || maxBackups <= 0 {
 		return nil
 	}
@@ -305,21 +511,23 @@ func (u *Updater) cleanupOldBackups(backupDir string, maxBackups int) error {
 		return infoI.ModTime().Before(infoJ.ModTime())
 	})
 
+	log := logger.FromContext(ctx)
 	toDelete := len(backups) - maxBackups
 	for i := 0; i < toDelete; i++ {
 		path := filepath.Join(backupDir, backups[i].Name())
 		if err := os.Remove(path); err != nil {
-			u.logger.Warn("failed to remove old backup", "path", path, "error", err.Error())
+			log.Warn("failed to remove old backup", "path", path, "error", err.Error())
 		} else {
-			u.logger.Info("removed old backup", "path", path)
+			log.Info("removed old backup", "path", path)
 		}
 	}
 
 	return nil
 }
 
-// parseIPFromVpnURL извлекает IP-адрес из VPN-ссылки.
-func parseIPFromVpnURL(vpnURL string) (string, error) {
+// parseIPFromVpnURL извлекает IP-адрес из VPN-ссылки. Если хост ссылки —
+// доменное имя, резолвит его через DNS и возвращает первый IP.
+func parseIPFromVpnURL(ctx context.Context, dns DNSResolver, vpnURL string) (string, error) {
 	if !strings.Contains(vpnURL, "://") {
 		return "", fmt.Errorf("invalid url: no scheme")
 	}
@@ -340,9 +548,72 @@ func parseIPFromVpnURL(vpnURL string) (string, error) {
 		return "", fmt.Errorf("empty host")
 	}
 
-	if net.ParseIP(host) == nil {
-		return "", fmt.Errorf("host is not a valid IP: %s", host)
+	if ip := net.ParseIP(host); ip != nil {
+		return host, nil
 	}
 
-	return host, nil
+	ips, err := dns.LookupIP(ctx, "ip", host)
+	if err != nil {
+		return "", fmt.Errorf("resolve domain %s: %w", host, err)
+	}
+	if len(ips) == 0 {
+		return "", fmt.Errorf("no addresses for domain %s", host)
+	}
+	return ips[0].String(), nil
+}
+
+// truncateURL обрезает URL для логирования, оставляя только схему и хост.
+func truncateURL(vpnURL string) string {
+	u, err := url.Parse(vpnURL)
+	if err != nil {
+		return vpnURL
+	}
+	return u.Scheme + "://" + u.Host
+}
+
+// saveConfigWithValidation сохраняет конфигурацию с опциональной проверкой через CLI.
+// Если validator == nil, сохраняет напрямую. Если validator != nil, сохраняет во
+// временный файл, проверяет, и только потом заменяет оригинальный файл.
+func (u *Updater) saveConfigWithValidation(
+	ctx context.Context,
+	configPath string,
+	cfg *singbox.Config,
+) error {
+	if u.validator == nil {
+		return u.configStore.SaveConfig(configPath, cfg)
+	}
+
+	tmpPath := configPath + ".tmp"
+	if err := u.configStore.SaveConfig(tmpPath, cfg); err != nil {
+		return fmt.Errorf("save temp config: %w", err)
+	}
+
+	if err := u.validator.CheckConfig(ctx, tmpPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("config validation failed: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("replace config file: %w", err)
+	}
+
+	return nil
+}
+
+// outboundsEqual сравнивает два списка outbounds через JSON-представление.
+// Нужно вместо reflect.DeepEqual, потому что после CloneOutbounds (json
+// round-trip) все числа становятся float64, а свежесгенерированные
+// outbounds могут содержать int (например, tolerance в NewURLTestOutbound).
+// reflect.DeepEqual считает int(50) != float64(50), хотя данные идентичны.
+func outboundsEqual(a, b []singbox.Outbound) bool {
+	aJSON, err := json.Marshal(a)
+	if err != nil {
+		return false
+	}
+	bJSON, err := json.Marshal(b)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(aJSON, bJSON)
 }

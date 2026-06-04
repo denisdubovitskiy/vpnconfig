@@ -79,17 +79,22 @@ func SaveConfig(path string, cfg *Config) error {
 // RemoveSectionOutbounds удаляет все outbounds указанной секции.
 // Секция определяется по префиксу тега ("{section}-").
 // Ruleset outbounds (type: local, remote) не удаляются.
-func (cfg *Config) RemoveSectionOutbounds(section string) {
+// Возвращает количество удалённых outbounds.
+func (cfg *Config) RemoveSectionOutbounds(section string) int {
 	var filtered []Outbound
 	prefix := section + "-"
+	removed := 0
 
 	for _, o := range cfg.Outbounds {
 		if !strings.HasPrefix(o.Tag(), prefix) || isRulesetOutbound(o) {
 			filtered = append(filtered, o)
+		} else {
+			removed++
 		}
 	}
 
 	cfg.Outbounds = filtered
+	return removed
 }
 
 func isRulesetOutbound(o Outbound) bool {
@@ -103,7 +108,7 @@ func (cfg *Config) AddOutbounds(outbounds []Outbound) {
 }
 
 // NewURLTestOutbound создаёт urltest outbound.
-func NewURLTestOutbound(tag string, outbounds []string, testURL string, interval string, tolerance int) Outbound {
+func NewURLTestOutbound(tag string, outbounds []string, testURL, interval string, tolerance int) Outbound {
 	return Outbound{
 		"type":      "urltest",
 		"tag":       tag,
@@ -124,6 +129,25 @@ func NewSelectorOutbound(tag string, outbounds []string, defaultOutbound string)
 	}
 }
 
+// CloneOutbounds создаёт глубокую копию текущих outbounds.
+func (cfg *Config) CloneOutbounds() ([]Outbound, error) {
+	if len(cfg.Outbounds) == 0 {
+		return nil, nil
+	}
+
+	data, err := json.Marshal(cfg.Outbounds)
+	if err != nil {
+		return nil, fmt.Errorf("marshal outbounds for clone: %w", err)
+	}
+
+	var outbounds []Outbound
+	if err := json.Unmarshal(data, &outbounds); err != nil {
+		return nil, fmt.Errorf("unmarshal outbounds for clone: %w", err)
+	}
+
+	return outbounds, nil
+}
+
 // ConvertFromSingBoxOutbound конвертирует outbound из vpnurl пакета в Outbound.
 func ConvertFromSingBoxOutbound(v any) (Outbound, error) {
 	data, err := json.Marshal(v)
@@ -141,6 +165,12 @@ func ConvertFromSingBoxOutbound(v any) (Outbound, error) {
 
 // GenerateSectionOutbounds генерирует outbounds для секции.
 // Создаёт N прокси outbounds, urltest и selector.
+//
+// Копирует входные proxy outbounds, чтобы не мутировать мапы вызывающего.
+// Это важно, когда один и тот же proxy Outbound попадает в несколько секций
+// (например, Россия в MULTI_WEST и MULTI_RU): без копии установка тега во
+// второй секции перезапишет тег первой и в сохранённом sing-box.json
+// окажутся дублирующиеся или перепутанные теги.
 func GenerateSectionOutbounds(
 	section string,
 	proxies []Outbound,
@@ -148,14 +178,20 @@ func GenerateSectionOutbounds(
 	interval string,
 	tolerance int,
 ) []Outbound {
-	var result []Outbound
+	result := make([]Outbound, 0, len(proxies)+2)
 
 	// Теги прокси: section-1-out, section-2-out, ...
-	var proxyTags []string
+	proxyTags := make([]string, 0, len(proxies))
 	for i, proxy := range proxies {
+		// Shallow copy верхнего уровня: тег живёт на верхнем уровне Outbound,
+		// а вложенные структуры (tls, transport) только читаются после сборки.
+		clone := make(Outbound, len(proxy)+1)
+		for k, v := range proxy {
+			clone[k] = v
+		}
 		tag := fmt.Sprintf("%s-%d-out", section, i+1)
-		proxy.SetTag(tag)
-		result = append(result, proxy)
+		clone.SetTag(tag)
+		result = append(result, clone)
 		proxyTags = append(proxyTags, tag)
 	}
 
@@ -171,6 +207,24 @@ func GenerateSectionOutbounds(
 	result = append(result, selector)
 
 	return result
+}
+
+// Store реализует интерфейс updater.ConfigStore через функции пакета singbox.
+type Store struct{}
+
+// LoadConfig загружает конфигурацию sing-box из JSON-файла.
+func (s *Store) LoadConfig(path string) (*Config, error) {
+	return LoadConfig(path)
+}
+
+// SaveConfig сохраняет конфигурацию sing-box в JSON-файл.
+func (s *Store) SaveConfig(path string, cfg *Config) error {
+	return SaveConfig(path, cfg)
+}
+
+// CreateBackup создаёт backup конфигурации sing-box с timestamp в имени файла.
+func (s *Store) CreateBackup(configPath string) (string, error) {
+	return CreateBackup(configPath)
 }
 
 // CreateBackup создаёт backup конфигурации sing-box с timestamp в имени файла.

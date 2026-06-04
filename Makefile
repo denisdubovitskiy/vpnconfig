@@ -70,15 +70,15 @@ test-cover-html: ## Запустить тесты и открыть coverage rep
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Отчёт: coverage.html"
 
-lint: ## Запустить линтеры (go vet)
-	@echo "Запуск go vet..."
-	go vet $(CURDIR)/...
+lint: ## Запустить golangci-lint
+	@echo "Запуск golangci-lint..."
+	GOPROXY=$(GOPROXY) go tool golangci-lint run $(CURDIR)/...
+
+vet: lint ## Алиас для lint
 
 fmt: ## Отформатировать код
 	@echo "Форматирование..."
 	gofmt -w .
-
-vet: lint ## Алиас для lint
 
 check: fmt vet test build ## Полная проверка: форматирование, линтер, тесты, сборка
 	@echo ""

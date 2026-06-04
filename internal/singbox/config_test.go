@@ -89,6 +89,22 @@ func TestSaveConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(data), "direct-out")
 	})
+
+	// Проверяем ошибку записи при невалидном пути.
+	t.Run("error on invalid path", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		cfg := &Config{}
+		invalidPath := filepath.Join(t.TempDir(), "nonexistent_subdir", "singbox.json")
+
+		// act
+		err := SaveConfig(invalidPath, cfg)
+
+		// assert
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "write singbox config")
+	})
 }
 
 func TestConfig_RemoveSectionOutbounds(t *testing.T) {
@@ -178,6 +194,51 @@ func TestGenerateSectionOutbounds(t *testing.T) {
 		assert.Equal(t, []string{"TEST-1-out", "TEST-2-out", "TEST-urltest-out"}, outbounds[3]["outbounds"])
 		assert.Equal(t, "TEST-urltest-out", outbounds[3]["default"])
 	})
+
+	// Защита от регрессии: GenerateSectionOutbounds не должен мутировать
+	// входные proxy outbounds. Это критично, когда один и тот же Outbound
+	// попадает в несколько секций (например, Россия в MULTI_WEST и MULTI_RU):
+	// без копии тег первой секции перезаписывался тегом второй, и в
+	// сохранённом sing-box.json появлялись перепутанные/дублирующиеся теги.
+	t.Run("does not mutate input proxies", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		proxies := []Outbound{
+			{"type": "vless", "server": "203.0.113.1"},
+			{"type": "trojan", "server": "203.0.113.2"},
+		}
+
+		// act
+		_ = GenerateSectionOutbounds("SECTION_A", proxies, "https://test.com", "3m", 50)
+		_ = GenerateSectionOutbounds("SECTION_B", proxies, "https://test.com", "3m", 50)
+
+		// assert: теги и остальные поля входных мап не изменились.
+		assert.Empty(t, proxies[0].Tag(), "first proxy tag must remain empty after generation")
+		assert.Empty(t, proxies[1].Tag(), "second proxy tag must remain empty after generation")
+		assert.Equal(t, "203.0.113.1", proxies[0]["server"])
+		assert.Equal(t, "203.0.113.2", proxies[1]["server"])
+	})
+
+	// Защита от регрессии: повторный вызов с тем же input даёт независимые
+	// результаты — сгенерированные outbounds не должны разделять общие мапы,
+	// иначе изменение тега в одной секции повлияет на другую.
+	t.Run("results are independent across calls", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		proxies := []Outbound{
+			{"type": "vless", "server": "203.0.113.1"},
+		}
+
+		// act
+		first := GenerateSectionOutbounds("SECTION_A", proxies, "https://test.com", "3m", 50)
+		second := GenerateSectionOutbounds("SECTION_B", proxies, "https://test.com", "3m", 50)
+
+		// assert: теги в обоих результатах соответствуют своим секциям.
+		assert.Equal(t, "SECTION_A-1-out", first[0].Tag())
+		assert.Equal(t, "SECTION_B-1-out", second[0].Tag())
+	})
 }
 
 func TestOutbound_Tag(t *testing.T) {
@@ -221,5 +282,245 @@ func TestOutbound_SetTag(t *testing.T) {
 
 		// assert
 		assert.Equal(t, "new-tag", o.Tag())
+	})
+}
+
+func TestAddOutbounds(t *testing.T) {
+	t.Parallel()
+
+	// Проверяем добавление outbounds в пустой список.
+	t.Run("appends to empty list", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		cfg := &Config{}
+
+		// act
+		cfg.AddOutbounds([]Outbound{{"type": "vless", "tag": "vless-1-out"}})
+
+		// assert
+		require.Len(t, cfg.Outbounds, 1)
+		assert.Equal(t, "vless-1-out", cfg.Outbounds[0].Tag())
+	})
+
+	// Проверяем добавление к существующему списку.
+	t.Run("appends to existing list", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		cfg := &Config{
+			Outbounds: []Outbound{{"type": "direct", "tag": "direct-out"}},
+		}
+
+		// act
+		cfg.AddOutbounds([]Outbound{
+			{"type": "vless", "tag": "vless-1-out"},
+			{"type": "trojan", "tag": "trojan-1-out"},
+		})
+
+		// assert
+		require.Len(t, cfg.Outbounds, 3)
+		assert.Equal(t, "direct-out", cfg.Outbounds[0].Tag())
+		assert.Equal(t, "vless-1-out", cfg.Outbounds[1].Tag())
+		assert.Equal(t, "trojan-1-out", cfg.Outbounds[2].Tag())
+	})
+}
+
+func TestCloneOutbounds(t *testing.T) {
+	t.Parallel()
+
+	// Проверяем клонирование непустого списка.
+	t.Run("clones non-empty list", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		cfg := &Config{
+			Outbounds: []Outbound{
+				{"type": "vless", "tag": "test-1-out"},
+				{"type": "trojan", "tag": "test-2-out"},
+			},
+		}
+
+		// act
+		clone, err := cfg.CloneOutbounds()
+
+		// assert
+		require.NoError(t, err)
+		require.Len(t, clone, 2)
+		assert.Equal(t, "test-1-out", clone[0].Tag())
+		assert.Equal(t, "test-2-out", clone[1].Tag())
+	})
+
+	// Проверяем возврат nil для пустого списка.
+	t.Run("empty config returns nil", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		cfg := &Config{}
+
+		// act
+		clone, err := cfg.CloneOutbounds()
+
+		// assert
+		require.NoError(t, err)
+		assert.Nil(t, clone)
+	})
+
+	// Проверяем, что клон — глубокая копия.
+	t.Run("produces deep copy", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		cfg := &Config{
+			Outbounds: []Outbound{
+				{"type": "vless", "tag": "original", "server": "1.1.1.1"},
+			},
+		}
+
+		// act
+		clone, err := cfg.CloneOutbounds()
+		require.NoError(t, err)
+		clone[0].SetTag("modified")
+		clone[0]["server"] = "2.2.2.2"
+
+		// assert
+		assert.Equal(t, "original", cfg.Outbounds[0].Tag())
+		assert.Equal(t, "1.1.1.1", cfg.Outbounds[0]["server"])
+	})
+}
+
+func TestConvertFromSingBoxOutbound(t *testing.T) {
+	t.Parallel()
+
+	// Проверяем конвертацию из map.
+	t.Run("converts from map", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		src := map[string]any{
+			"type":   "vless",
+			"tag":    "test-out",
+			"server": "1.1.1.1",
+		}
+
+		// act
+		out, err := ConvertFromSingBoxOutbound(src)
+
+		// assert
+		require.NoError(t, err)
+		assert.Equal(t, "vless", out.Type())
+		assert.Equal(t, "test-out", out.Tag())
+		assert.Equal(t, "1.1.1.1", out["server"])
+	})
+}
+
+func TestOutbound_Type(t *testing.T) {
+	t.Parallel()
+
+	// Проверяем получение типа как строки.
+	t.Run("returns type for string", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		o := Outbound{"type": "vless"}
+
+		// act & assert
+		assert.Equal(t, "vless", o.Type())
+	})
+
+	// Проверяем возврат пустой строки при отсутствии типа.
+	t.Run("returns empty for missing type", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		o := Outbound{}
+
+		// act & assert
+		assert.Empty(t, o.Type())
+	})
+
+	// Проверяем возврат пустой строки для не-строкового типа.
+	t.Run("returns empty for non-string type", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		o := Outbound{"type": 42}
+
+		// act & assert
+		assert.Empty(t, o.Type())
+	})
+}
+
+func TestStore_LoadConfig(t *testing.T) {
+	t.Parallel()
+
+	// Проверяем делегирование в LoadConfig.
+	t.Run("delegates to LoadConfig", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		dir := t.TempDir()
+		path := filepath.Join(dir, "singbox.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"outbounds":[]}`), 0o644))
+
+		// act
+		cfg, err := (&Store{}).LoadConfig(path)
+
+		// assert
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+	})
+}
+
+func TestStore_SaveConfig(t *testing.T) {
+	t.Parallel()
+
+	// Проверяем делегирование в SaveConfig.
+	t.Run("delegates to SaveConfig", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		dir := t.TempDir()
+		path := filepath.Join(dir, "singbox.json")
+		cfg := &Config{Outbounds: []Outbound{{"type": "direct", "tag": "direct-out"}}}
+		store := &Store{}
+
+		// act
+		err := store.SaveConfig(path, cfg)
+
+		// assert
+		require.NoError(t, err)
+
+		loaded, err := LoadConfig(path)
+		require.NoError(t, err)
+		require.Len(t, loaded.Outbounds, 1)
+		assert.Equal(t, "direct-out", loaded.Outbounds[0].Tag())
+	})
+}
+
+func TestStore_CreateBackup(t *testing.T) {
+	t.Parallel()
+
+	// Проверяем делегирование в CreateBackup.
+	t.Run("delegates to CreateBackup", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		dir := t.TempDir()
+		path := filepath.Join(dir, "singbox.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"outbounds":[]}`), 0o644))
+
+		// act
+		backupPath, err := (&Store{}).CreateBackup(path)
+
+		// assert
+		require.NoError(t, err)
+		assert.Contains(t, backupPath, ".backup_")
+
+		original, err := os.ReadFile(path)
+		require.NoError(t, err)
+		backed, err := os.ReadFile(backupPath)
+		require.NoError(t, err)
+		assert.Equal(t, original, backed)
 	})
 }

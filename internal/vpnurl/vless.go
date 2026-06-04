@@ -14,6 +14,7 @@ type VLESSOutbound struct {
 	ServerPort   int              `json:"server_port"`
 	UUID         string           `json:"uuid"`
 	Flow         string           `json:"flow,omitempty"`
+	Network      string           `json:"network,omitempty"`
 	TLS          *TLSConfig       `json:"tls,omitempty"`
 	Transport    *TransportConfig `json:"transport,omitempty"`
 }
@@ -85,14 +86,22 @@ func (p *VlessParser) Parse(vpnURL string) (SingBoxOutbound, error) {
 		}
 	}
 
+	// Network (tcp/udp).
+	if network := query.Get("network"); network != "" {
+		outbound.Network = network
+	}
+
 	// Транспорт.
-	network := query.Get("type")
-	if network != "" && network != "tcp" {
+	transportType := query.Get("type")
+	if transportType != "" && transportType != "tcp" {
 		outbound.Transport = &TransportConfig{
-			Type: network,
+			Type: transportType,
 		}
-		if network == "grpc" {
+		if transportType == "grpc" {
 			outbound.Transport.ServiceName = query.Get("serviceName")
+		}
+		if host := query.Get("host"); host != "" {
+			outbound.Transport.Host = host
 		}
 	}
 

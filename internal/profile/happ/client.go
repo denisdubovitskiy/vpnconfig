@@ -43,7 +43,7 @@ func NewClient(httpClient Doer) *Client {
 // FetchLinks выполняет запрос к hynet.space и возвращает список ссылок.
 // Ответ декодируется из base64, каждая строка — отдельная ссылка.
 func (c *Client) FetchLinks(ctx context.Context, url string) ([]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -52,6 +52,7 @@ func (c *Client) FetchLinks(ctx context.Context, url string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
+	//nolint:errcheck // стандартная идиома игнорировать ошибку Close body.
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {

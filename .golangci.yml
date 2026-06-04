@@ -1,0 +1,91 @@
+# Конфигурация golangci-lint v2.
+version: "2"
+
+linters:
+  # Стандартный набор v2: errcheck, gosimple, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - asasalint        # pass []any в variadic func(...any)
+    - asciicheck       # non-ASCII идентификаторы
+    - bidichk          # опасные BiDi-последовательности
+    - bodyclose        # незакрытые HTTP response body
+    - contextcheck     # неунаследованный context
+    - durationcheck    # duration * duration
+    - errorlint        # %w vs %v при оборачивании ошибок
+    - errname          # naming convention для ошибок
+    - gocritic         # набор разнообразных проверок
+    - gomoddirectives  # go.mod: replace/retract
+    - misspell         # опечатки в комментариях/строках
+    - nakedret         # голые return в функциях > max-func-lines
+    - nilerr           # return nil при err != nil
+    - nilnil           # возврат (nil, nil) из функций с error
+    - noctx            # HTTP-вызовы без context.Context
+    - nolintlint       # //nolint комментарии требуют обоснования
+    - prealloc         # make с ёмкостью
+    - predeclared      # shadowing predeclared identifiers
+    - reassign         # переприсвоение package-level vars
+    - revive           # замена golint, extensible
+    - rowserrcheck     # errors из rows.Err() не проверены
+    - sqlclosecheck    # незакрытые rows/stmt
+    - thelper          # t.Helper() в test-хелперах
+    - tparallel        # t.Parallel() в тестах
+    - unconvert        # лишние type conversions
+    - unparam          # неиспользуемые параметры
+    - usestdlibvars    # использование stdlib vars
+    - wastedassign     # wasted assignment statements
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+      disabled-checks:
+        - hugeParam
+        - rangeExprCopy
+        - rangeValCopy
+        # BDD-комментарии // arrange / // act / // assert ошибочно
+        # определяются как закомментированный код.
+        - commentedOutCode
+        # Нормальный Go-паттерн: `x := append(y, z)` не мутирует y.
+        - appendAssign
+        # Именованные returns — стилистическое предпочтение, не правило.
+        - unnamedResult
+    errcheck:
+      check-type-assertions: true
+      # check-blank отключён: `_ = expr` — явное выражение намерения
+      # проигнорировать ошибку, лишний шум от errcheck не нужен.
+      check-blank: false
+      exclude-functions:
+        - io.Copy(*bytes.Buffer)
+        - io.Copy(os.Stdout)
+    govet:
+      disable:
+        - fieldalignment
+    nakedret:
+      max-func-lines: 1
+    revive:
+      rules:
+        - name: var-naming
+          disabled: true
+  exclusions:
+    # Сгенерированные моки не должны линтоваться.
+    paths:
+      - ".*_mocks_test\\.go$"
+    rules:
+      # В тестах часто намеренно не используется response body — bodyclose
+      # генерирует ложные срабатывания. То же с http.Get/NewRequest без
+      # context — тестам это не критично.
+      - linters:
+          - bodyclose
+          - noctx
+        path: _test\.go$
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true

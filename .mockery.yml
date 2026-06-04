@@ -1,11 +1,36 @@
 force-file-write: true
 
 packages:
-  github.com/denisdubovitskiy/vpnconfig/internal/happ:
+  github.com/denisdubovitskiy/vpnconfig/internal/command:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      Executor:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/singboxcli:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      ConfigValidator:
+      CommandExecutor:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/profile/happ:
     config:
       filename: zzz_mocks_test.go
     interfaces:
       Doer:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/profile/plaintext:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      Doer:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/resolver:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      IPResolver:
 
   github.com/denisdubovitskiy/vpnconfig/internal/http:
     config:
@@ -18,8 +43,14 @@ packages:
     config:
       filename: zzz_mocks_test.go
     interfaces:
-      Doer:
       IPLookup:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/ipserv/mmdb:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      GeoReader:
+      HTTPDoer:
 
   github.com/denisdubovitskiy/vpnconfig/internal/useragent:
     config:
@@ -41,3 +72,4 @@ packages:
       GeoIPService:
       VPNParser:
       ConfigStore:
+      ConfigValidator:

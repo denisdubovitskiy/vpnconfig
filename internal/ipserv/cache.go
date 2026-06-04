@@ -1,6 +1,7 @@
 package ipserv
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,8 +9,8 @@ import (
 	"time"
 )
 
-// Cache определяет интерфейс для чтения и записи кеша.
-type Cache interface {
+// Storage определяет интерфейс для чтения и записи кеша.
+type Storage interface {
 	// Read читает весь кеш и возвращает мапу записей.
 	Read() (map[string]cacheEntry, error)
 	// Write записывает весь кеш в хранилище.
@@ -81,7 +82,7 @@ func (c *FileCache) Read() (map[string]cacheEntry, error) {
 func (c *FileCache) Write(data map[string]cacheEntry) error {
 	// Создаём директорию, если её нет.
 	dir := filepath.Dir(c.path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create cache directory: %w", err)
 	}
 
@@ -99,9 +100,96 @@ func (c *FileCache) Write(data map[string]cacheEntry) error {
 		return fmt.Errorf("marshal cache: %w", err)
 	}
 
-	if err := os.WriteFile(c.path, encoded, 0644); err != nil {
+	if err := os.WriteFile(c.path, encoded, 0o644); err != nil {
 		return fmt.Errorf("write cache file: %w", err)
 	}
 
 	return nil
+}
+
+// CachedIPLookup оборачивает IPLookup с кешированием результатов.
+// Реализует интерфейс IPLookup, поэтому может использоваться как декоратор.
+type CachedIPLookup struct {
+	provider IPLookup
+	storage  Storage
+	nowFn    func() time.Time
+}
+
+// NewCachedIPLookup создаёт кеширующий декоратор для IPLookup.
+func NewCachedIPLookup(provider IPLookup, storage Storage) *CachedIPLookup {
+	return &CachedIPLookup{
+		provider: provider,
+		storage:  storage,
+		nowFn:    time.Now,
+	}
+}
+
+// CountryName возвращает название страны для заданного IP.
+// Обёртка над CountryByIP для совместимости с updater.GeoIPService.
+func (c *CachedIPLookup) CountryName(ctx context.Context, ip string) (string, error) {
+	loc, err := c.CountryByIP(ctx, ip)
+	if err != nil {
+		return "", err
+	}
+	return loc.Country, nil
+}
+
+// CountryByIP возвращает название страны для заданного IP.
+// Сначала проверяет кеш, если нет — делегирует provider, затем сохраняет результат.
+func (c *CachedIPLookup) CountryByIP(ctx context.Context, ip string) (*Location, error) {
+	// Проверяем кеш.
+	if entry, ok := c.readCache(ip); ok {
+		return &Location{
+			Status:  "success",
+			Country: entry.Country,
+			Query:   ip,
+		}, nil
+	}
+
+	// Делаем запрос к провайдеру.
+	loc, err := c.provider.CountryByIP(ctx, ip)
+	if err != nil {
+		return nil, fmt.Errorf("lookup country: %w", err)
+	}
+
+	// Сохраняем в кеш.
+	if err := c.writeCache(ip, loc.Country); err != nil {
+		// Ошибка записи кеша не критична — просто возвращаем результат.
+		//nolint:nilerr // намеренно проглатываем ошибку кеширования.
+		return loc, nil
+	}
+
+	return loc, nil
+}
+
+// readCache читает кеш и ищет запись для указанного IP.
+func (c *CachedIPLookup) readCache(ip string) (*cacheEntry, bool) {
+	cache, err := c.storage.Read()
+	if err != nil {
+		return nil, false
+	}
+
+	entry, ok := cache[ip]
+	if !ok {
+		return nil, false
+	}
+
+	return &entry, true
+}
+
+// writeCache читает существующий кеш, добавляет/обновляет запись и сохраняет.
+func (c *CachedIPLookup) writeCache(ip, country string) error {
+	cache, err := c.storage.Read()
+	if err != nil {
+		// Если чтение не удалось — создаём новый кеш.
+		cache = make(map[string]cacheEntry)
+	}
+
+	// Добавляем/обновляем запись.
+	cache[ip] = cacheEntry{
+		Country:   country,
+		Timestamp: c.nowFn(),
+	}
+
+	return c.storage.Write(cache)
 }

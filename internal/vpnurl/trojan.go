@@ -13,6 +13,7 @@ type TrojanOutbound struct {
 	Server       string           `json:"server"`
 	ServerPort   int              `json:"server_port"`
 	Password     string           `json:"password"`
+	Network      string           `json:"network,omitempty"`
 	TLS          *TLSConfig       `json:"tls,omitempty"`
 	Transport    *TransportConfig `json:"transport,omitempty"`
 }
@@ -65,12 +66,20 @@ func (p *TrojanParser) Parse(vpnURL string) (SingBoxOutbound, error) {
 		}
 	}
 
+	// Network (tcp/udp).
+	if network := query.Get("network"); network != "" {
+		outbound.Network = network
+	}
+
 	// Транспорт.
-	network := query.Get("type")
-	if network != "" {
+	transportType := query.Get("type")
+	if transportType != "" && transportType != "tcp" {
 		outbound.Transport = &TransportConfig{
-			Type: network,
+			Type: transportType,
 			Path: query.Get("path"),
+		}
+		if host := query.Get("host"); host != "" {
+			outbound.Transport.Host = host
 		}
 	}
 

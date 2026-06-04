@@ -11,26 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newTestService создаёт сервис с тестовым моком и временным кешем.
-func newTestService(t *testing.T, cacheOpts ...Option) (*Service, *MockIPLookup, Cache) {
+// newTestCachedLookup создаёт CachedIPLookup с тестовым моком и временным кешем.
+func newTestCachedLookup(t *testing.T, cacheOpts ...Option) (*CachedIPLookup, *MockIPLookup, Storage) {
 	t.Helper()
 
 	cachePath := filepath.Join(t.TempDir(), "cache.json")
 	mockLookup := NewMockIPLookup(t)
-	cache := NewFileCache(cachePath, cacheOpts...)
-	svc := NewService(mockLookup, cache)
+	storage := NewFileCache(cachePath, cacheOpts...)
+	lookup := NewCachedIPLookup(mockLookup, storage)
 
-	return svc, mockLookup, cache
+	return lookup, mockLookup, storage
 }
 
 // writeCacheFile записывает тестовые данные в файл кеша в формате map.
-func writeCacheFile(t *testing.T, cache Cache, data map[string]cacheEntry) {
+func writeCacheFile(t *testing.T, storage Storage, data map[string]cacheEntry) {
 	t.Helper()
 
-	require.NoError(t, cache.Write(data))
+	require.NoError(t, storage.Write(data))
 }
 
-func TestService_CountryName(t *testing.T) {
+func TestCachedIPLookup_CountryByIP(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -45,7 +45,7 @@ func TestService_CountryName(t *testing.T) {
 		t.Parallel()
 
 		// arrange
-		svc, mockLookup, cache := newTestService(t)
+		lookup, mockLookup, storage := newTestCachedLookup(t)
 		mockLookup.EXPECT().
 			CountryByIP(mock.Anything, testIP).
 			Return(
@@ -58,13 +58,14 @@ func TestService_CountryName(t *testing.T) {
 			)
 
 		// act
-		got, err := svc.CountryName(t.Context(), testIP)
+		loc, err := lookup.CountryByIP(t.Context(), testIP)
 
 		// assert
 		require.NoError(t, err)
-		assert.Equal(t, testCountry, got)
+		require.NotNil(t, loc)
+		assert.Equal(t, testCountry, loc.Country)
 
-		cacheData, err := cache.Read()
+		cacheData, err := storage.Read()
 		require.NoError(t, err)
 
 		entry, ok := cacheData[testIP]
@@ -79,8 +80,8 @@ func TestService_CountryName(t *testing.T) {
 
 		// arrange
 		const cachedCountry = "CachedCountry"
-		svc, mockLookup, cache := newTestService(t)
-		writeCacheFile(t, cache, map[string]cacheEntry{
+		lookup, mockLookup, storage := newTestCachedLookup(t)
+		writeCacheFile(t, storage, map[string]cacheEntry{
 			testIP: {
 				Country:   cachedCountry,
 				Timestamp: time.Now(),
@@ -88,11 +89,12 @@ func TestService_CountryName(t *testing.T) {
 		})
 
 		// act
-		got, err := svc.CountryName(t.Context(), testIP)
+		loc, err := lookup.CountryByIP(t.Context(), testIP)
 
 		// assert
 		require.NoError(t, err)
-		assert.Equal(t, cachedCountry, got)
+		require.NotNil(t, loc)
+		assert.Equal(t, cachedCountry, loc.Country)
 		mockLookup.AssertNotCalled(t, "CountryByIP")
 	})
 
@@ -102,8 +104,8 @@ func TestService_CountryName(t *testing.T) {
 
 		// arrange
 		const newCountry = "NewCountry"
-		svc, mockLookup, cache := newTestService(t, WithTTL(time.Hour))
-		writeCacheFile(t, cache, map[string]cacheEntry{
+		lookup, mockLookup, storage := newTestCachedLookup(t, WithTTL(time.Hour))
+		writeCacheFile(t, storage, map[string]cacheEntry{
 			testIP: {
 				Country:   "OldCountry",
 				Timestamp: time.Now().Add(-2 * time.Hour),
@@ -121,11 +123,12 @@ func TestService_CountryName(t *testing.T) {
 			)
 
 		// act
-		got, err := svc.CountryName(t.Context(), testIP)
+		loc, err := lookup.CountryByIP(t.Context(), testIP)
 
 		// assert
 		require.NoError(t, err)
-		assert.Equal(t, newCountry, got)
+		require.NotNil(t, loc)
+		assert.Equal(t, newCountry, loc.Country)
 	})
 
 	// Проверяем обработку ошибки от API.
@@ -134,13 +137,13 @@ func TestService_CountryName(t *testing.T) {
 
 		// arrange
 		wantErr := errors.New("api unavailable")
-		svc, mockLookup, _ := newTestService(t)
+		lookup, mockLookup, _ := newTestCachedLookup(t)
 		mockLookup.EXPECT().
 			CountryByIP(mock.Anything, testIP).
 			Return(nil, wantErr)
 
 		// act
-		_, err := svc.CountryName(t.Context(), testIP)
+		_, err := lookup.CountryByIP(t.Context(), testIP)
 
 		// assert
 		require.Error(t, err)
@@ -152,7 +155,7 @@ func TestService_CountryName(t *testing.T) {
 		t.Parallel()
 
 		// arrange
-		svc, mockLookup, _ := newTestService(t)
+		lookup, mockLookup, _ := newTestCachedLookup(t)
 		mockLookup.EXPECT().
 			CountryByIP(mock.Anything, "").
 			Return(
@@ -165,11 +168,12 @@ func TestService_CountryName(t *testing.T) {
 			)
 
 		// act
-		got, err := svc.CountryName(t.Context(), "")
+		loc, err := lookup.CountryByIP(t.Context(), "")
 
 		// assert
 		require.NoError(t, err)
-		assert.Equal(t, testAutoCountry, got)
+		require.NotNil(t, loc)
+		assert.Equal(t, testAutoCountry, loc.Country)
 	})
 
 	// Проверяем, что кеш сохраняет старые записи при добавлении новых.
@@ -181,8 +185,8 @@ func TestService_CountryName(t *testing.T) {
 			oldIP      = "203.0.113.1"
 			oldCountry = "Sweden"
 		)
-		svc, mockLookup, cache := newTestService(t)
-		writeCacheFile(t, cache, map[string]cacheEntry{
+		lookup, mockLookup, storage := newTestCachedLookup(t)
+		writeCacheFile(t, storage, map[string]cacheEntry{
 			oldIP: {
 				Country:   oldCountry,
 				Timestamp: time.Now(),
@@ -200,13 +204,14 @@ func TestService_CountryName(t *testing.T) {
 			)
 
 		// act
-		got, err := svc.CountryName(t.Context(), testIP)
+		loc, err := lookup.CountryByIP(t.Context(), testIP)
 
 		// assert
 		require.NoError(t, err)
-		assert.Equal(t, testCountry, got)
+		require.NotNil(t, loc)
+		assert.Equal(t, testCountry, loc.Country)
 
-		cacheData, err := cache.Read()
+		cacheData, err := storage.Read()
 		require.NoError(t, err)
 
 		// Проверяем, что старая запись сохранилась.
@@ -218,5 +223,81 @@ func TestService_CountryName(t *testing.T) {
 		newEntry, ok := cacheData[testIP]
 		require.True(t, ok)
 		assert.Equal(t, testCountry, newEntry.Country)
+	})
+}
+
+func TestCachedIPLookup_CountryName(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testIP      = "192.0.2.1"
+		testCountry = "Russia"
+	)
+
+	// Проверяем получение страны из кеша без запроса к API.
+	t.Run("returns country from cache", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		lookup, mockLookup, storage := newTestCachedLookup(t)
+		writeCacheFile(t, storage, map[string]cacheEntry{
+			testIP: {
+				Country:   testCountry,
+				Timestamp: time.Now(),
+			},
+		})
+
+		// act
+		country, err := lookup.CountryName(t.Context(), testIP)
+
+		// assert
+		require.NoError(t, err)
+		assert.Equal(t, testCountry, country)
+		mockLookup.AssertNotCalled(t, "CountryByIP")
+	})
+
+	// Проверяем запрос к API при отсутствии кеша.
+	t.Run("returns country from provider on cache miss", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		lookup, mockLookup, _ := newTestCachedLookup(t)
+		mockLookup.EXPECT().
+			CountryByIP(mock.Anything, testIP).
+			Return(
+				&Location{
+					Status:  "success",
+					Country: testCountry,
+					Query:   testIP,
+				},
+				nil,
+			)
+
+		// act
+		country, err := lookup.CountryName(t.Context(), testIP)
+
+		// assert
+		require.NoError(t, err)
+		assert.Equal(t, testCountry, country)
+	})
+
+	// Проверяем обработку ошибки от API.
+	t.Run("propagates provider error", func(t *testing.T) {
+		t.Parallel()
+
+		// arrange
+		wantErr := errors.New("api unavailable")
+		lookup, mockLookup, _ := newTestCachedLookup(t)
+		mockLookup.EXPECT().
+			CountryByIP(mock.Anything, testIP).
+			Return(nil, wantErr)
+
+		// act
+		country, err := lookup.CountryName(t.Context(), testIP)
+
+		// assert
+		assert.Empty(t, country)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, wantErr)
 	})
 }
