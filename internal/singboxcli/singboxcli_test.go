@@ -37,7 +37,8 @@ func TestCLIChecker_CheckConfig(t *testing.T) {
 		// arrange
 		const customCLIPath = "/opt/sing-box/bin/sing-box"
 		executor := NewMockCommandExecutor(t)
-		executor.EXPECT().
+		executor.
+			EXPECT().
 			Exec(
 				mock.Anything,
 				customCLIPath,
@@ -60,7 +61,8 @@ func TestCLIChecker_CheckConfig(t *testing.T) {
 
 		// arrange
 		executor := NewMockCommandExecutor(t)
-		executor.EXPECT().
+		executor.
+			EXPECT().
 			Exec(
 				mock.Anything,
 				testDefaultCLI,
@@ -86,7 +88,8 @@ func TestCLIChecker_CheckConfig(t *testing.T) {
 		const diagOutput = "Error: invalid configuration at line 42"
 		execErr := errors.New("exit status 1")
 		executor := NewMockCommandExecutor(t)
-		executor.EXPECT().
+		executor.
+			EXPECT().
 			Exec(
 				mock.Anything,
 				testDefaultCLI,
@@ -114,7 +117,8 @@ func TestCLIChecker_CheckConfig(t *testing.T) {
 		// arrange
 		execErr := errors.New("exit status 1")
 		executor := NewMockCommandExecutor(t)
-		executor.EXPECT().
+		executor.
+			EXPECT().
 			Exec(
 				mock.Anything,
 				testDefaultCLI,
@@ -142,7 +146,8 @@ func TestCLIChecker_CheckConfig(t *testing.T) {
 		const cleanOutput = "Error: bad config"
 		const paddedOutput = cleanOutput + "\n\n  \t"
 		executor := NewMockCommandExecutor(t)
-		executor.EXPECT().
+		executor.
+			EXPECT().
 			Exec(
 				mock.Anything,
 				testDefaultCLI,
@@ -170,7 +175,8 @@ func TestCLIChecker_CheckConfig(t *testing.T) {
 		type ctxKey struct{}
 		ctx := context.WithValue(t.Context(), ctxKey{}, "vpnconfig-marker")
 		executor := NewMockCommandExecutor(t)
-		executor.EXPECT().
+		executor.
+			EXPECT().
 			Exec(
 				mock.MatchedBy(func(c context.Context) bool {
 					return c.Value(ctxKey{}) == "vpnconfig-marker"

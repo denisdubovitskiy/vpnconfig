@@ -179,6 +179,7 @@ func (e *testEnv) buildUpdater(t *testing.T) *updater.Updater {
 		e.parser,
 		e.store,
 		e.validator,
+		nil,
 	)
 }
 
@@ -620,6 +621,7 @@ func TestE2E_DNSResolution(t *testing.T) {
 	u := updater.NewUpdater(
 		fetchers, dns, geoService,
 		env.parser, env.store, env.validator,
+		nil,
 	)
 
 	result, err := u.Run(ctx, env.buildConfig(t))

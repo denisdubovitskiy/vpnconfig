@@ -8,6 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/denisdubovitskiy/vpnconfig/internal/ipserv/providers"
+	"github.com/denisdubovitskiy/vpnconfig/internal/pkg/duration"
 )
 
 // URLTestDefaults представляет настройки по умолчанию для urltest outbound.
@@ -52,7 +53,7 @@ type MMDBConfig struct {
 	// По умолчанию (если поле не задано в YAML) используется
 	// DefaultMMDBMaxAge (168h = 1 неделя) — применяется в Normalize.
 	// Формат значения — Go duration string: "720h", "30m", "24h".
-	MaxAge Duration `yaml:"max_age,omitempty"`
+	MaxAge duration.Duration `yaml:"max_age,omitempty"`
 }
 
 // SourceType тип источника подписки.
@@ -126,6 +127,31 @@ type Config struct {
 	// предпочтительный. Если список пуст — используется системный резолвер
 	// (net.DefaultResolver).
 	DNSResolvers []string `yaml:"dns_resolvers,omitempty"`
+	// Checker — настройки проверки VPN-ссылок через локальный sing-box.
+	// Если nil или Enabled == false — проверка ссылок не выполняется.
+	Checker *CheckerConfig `yaml:"checker,omitempty"`
+}
+
+// CheckerConfig описывает настройки проверки VPN-ссылок через локальный sing-box.
+// При включении каждая VPN-ссылка проверяется запуском sing-box с минимальным
+// конфигом и выполнением HTTP-запроса через прокси. Ссылки, не прошедшие
+// проверку, исключаются из обновления.
+type CheckerConfig struct {
+	// Enabled — флаг активации проверки VPN-ссылок. По умолчанию false.
+	Enabled bool `yaml:"enabled"`
+	// SingBoxPath — путь к утилите sing-box.
+	// Если пустая строка — используется "sing-box" из PATH.
+	SingBoxPath string `yaml:"sing_box_path,omitempty"`
+	// TmpDirectory — директория для временных файлов конфигов.
+	// Если пустая строка — используется OS temp directory.
+	TmpDirectory string `yaml:"tmp_directory,omitempty"`
+	// Timeout — максимальное время проверки одной ссылки.
+	// Формат: Go duration string ("10s", "30s", "1m").
+	// По умолчанию: 10s.
+	Timeout duration.Duration `yaml:"timeout,omitempty"`
+	// URLs — список URL для проверки connectivity через sing-box.
+	// По умолчанию: ["https://www.gstatic.com/generate_204"].
+	URLs []string `yaml:"urls,omitempty"`
 }
 
 // Load читает конфигурацию из YAML-файла.
@@ -213,6 +239,11 @@ func (c *Config) SingboxCLIEnabled() bool {
 	return c.SingboxCLI != nil && c.SingboxCLI.Enabled
 }
 
+// CheckerEnabled возвращает true, если проверка VPN-ссылок активирована.
+func (c *Config) CheckerEnabled() bool {
+	return c.Checker != nil && c.Checker.Enabled
+}
+
 // EffectiveMMDBDownloadURL возвращает URL для скачивания MMDB-базы.
 // Если в конфиге URL не задан, используется DefaultMMDBDownloadURL.
 func (c *MMDBConfig) EffectiveDownloadURL() string {
@@ -220,30 +251,4 @@ func (c *MMDBConfig) EffectiveDownloadURL() string {
 		return c.DownloadURL
 	}
 	return DefaultMMDBDownloadURL
-}
-
-// Duration — обёртка над time.Duration для парсинга из YAML в формате
-// Go duration string ("24h", "30m", "1h30m"). yaml.v3 не парсит
-// time.Duration напрямую.
-type Duration struct {
-	time.Duration
-}
-
-// UnmarshalYAML декодирует строку формата Go duration.
-func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
-	var s string
-	if err := value.Decode(&s); err != nil {
-		return err
-	}
-	parsed, err := time.ParseDuration(s)
-	if err != nil {
-		return fmt.Errorf("parse duration %q: %w", s, err)
-	}
-	d.Duration = parsed
-	return nil
-}
-
-// MarshalYAML кодирует значение в Go duration string.
-func (d Duration) MarshalYAML() (any, error) {
-	return d.String(), nil
 }

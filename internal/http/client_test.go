@@ -56,7 +56,8 @@ func TestUserAgentTransport_RoundTrip(t *testing.T) {
 			WithTransport(mrt),
 		)
 
-		mrt.EXPECT().
+		mrt.
+			EXPECT().
 			RoundTrip(mock.Anything).
 			Run(func(req *http.Request) {
 				assert.Equal(t, testUA, req.Header.Get("User-Agent"))
@@ -82,7 +83,8 @@ func TestUserAgentTransport_RoundTrip(t *testing.T) {
 
 		// arrange
 		mockGen := NewMockUserAgentGenerator(t)
-		mockGen.EXPECT().
+		mockGen.
+			EXPECT().
 			RandomUserAgent().
 			Return(testUA, true)
 
@@ -92,7 +94,8 @@ func TestUserAgentTransport_RoundTrip(t *testing.T) {
 			WithTransport(mrt),
 		)
 
-		mrt.EXPECT().
+		mrt.
+			EXPECT().
 			RoundTrip(mock.Anything).
 			Run(func(req *http.Request) {
 				assert.Equal(t, testUA, req.Header.Get("User-Agent"))
@@ -118,7 +121,8 @@ func TestUserAgentTransport_RoundTrip(t *testing.T) {
 
 		// arrange
 		mockGen := NewMockUserAgentGenerator(t)
-		mockGen.EXPECT().
+		mockGen.
+			EXPECT().
 			RandomUserAgent().
 			Return("", false)
 
@@ -128,7 +132,8 @@ func TestUserAgentTransport_RoundTrip(t *testing.T) {
 			WithTransport(mrt),
 		)
 
-		mrt.EXPECT().
+		mrt.
+			EXPECT().
 			RoundTrip(mock.Anything).
 			Run(func(req *http.Request) {
 				assert.Empty(t, req.Header.Get("User-Agent"))
@@ -161,7 +166,8 @@ func TestUserAgentTransport_RoundTrip(t *testing.T) {
 			WithTransport(mrt),
 		)
 
-		mrt.EXPECT().
+		mrt.
+			EXPECT().
 			RoundTrip(mock.Anything).
 			Run(func(req *http.Request) {
 				assert.Equal(t, testUA, req.Header.Get("User-Agent"))
@@ -194,7 +200,8 @@ func TestUserAgentTransport_RoundTrip(t *testing.T) {
 			WithTransport(mrt),
 		)
 
-		mrt.EXPECT().
+		mrt.
+			EXPECT().
 			RoundTrip(mock.Anything).
 			Return(
 				&http.Response{

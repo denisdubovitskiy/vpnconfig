@@ -308,7 +308,8 @@ func TestParser_Parse(t *testing.T) {
 		// arrange
 		mockParser := NewMockSchemeParser(t)
 		expectedOutbound := &VLESSOutbound{OutboundType: "vless"}
-		mockParser.EXPECT().
+		mockParser.
+			EXPECT().
 			Parse("vless://test").
 			Return(expectedOutbound, nil)
 
@@ -485,7 +486,8 @@ func TestParser_Parse_ErrorPropagation(t *testing.T) {
 
 		// arrange
 		mockParser := NewMockSchemeParser(t)
-		mockParser.EXPECT().
+		mockParser.
+			EXPECT().
 			Parse(mock.Anything).
 			Return(nil, assert.AnError)
 

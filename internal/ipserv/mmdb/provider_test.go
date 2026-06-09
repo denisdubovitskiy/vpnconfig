@@ -21,7 +21,8 @@ func TestProvider_CountryByIP(t *testing.T) {
 		// arrange
 		addr := netip.MustParseAddr(testIPGoogle)
 		reader := NewMockGeoReader(t)
-		reader.EXPECT().
+		reader.
+			EXPECT().
 			Country(addr).
 			Return(&geoip2.Country{
 				Country: geoip2.CountryRecord{
@@ -49,7 +50,8 @@ func TestProvider_CountryByIP(t *testing.T) {
 		// arrange
 		addr := netip.MustParseAddr(testIPCloudflare)
 		reader := NewMockGeoReader(t)
-		reader.EXPECT().
+		reader.
+			EXPECT().
 			Country(addr).
 			Return(&geoip2.Country{
 				Country: geoip2.CountryRecord{
@@ -75,7 +77,8 @@ func TestProvider_CountryByIP(t *testing.T) {
 		// arrange
 		addr := netip.MustParseAddr(testIPPrivate)
 		reader := NewMockGeoReader(t)
-		reader.EXPECT().
+		reader.
+			EXPECT().
 			Country(addr).
 			Return(&geoip2.Country{}, nil)
 
@@ -95,7 +98,8 @@ func TestProvider_CountryByIP(t *testing.T) {
 		// arrange
 		addr := netip.MustParseAddr(testIPPrivateRFC)
 		reader := NewMockGeoReader(t)
-		reader.EXPECT().
+		reader.
+			EXPECT().
 			Country(addr).
 			Return(nil, nil)
 
@@ -116,7 +120,8 @@ func TestProvider_CountryByIP(t *testing.T) {
 		addr := netip.MustParseAddr(testIPGoogle)
 		innerErr := errors.New("reader failed")
 		reader := NewMockGeoReader(t)
-		reader.EXPECT().
+		reader.
+			EXPECT().
 			Country(addr).
 			Return(nil, innerErr)
 
@@ -221,7 +226,8 @@ func TestProvider_Close(t *testing.T) {
 
 		// arrange
 		reader := NewMockGeoReader(t)
-		reader.EXPECT().Close().Return(nil)
+		reader.
+			EXPECT().Close().Return(nil)
 		p := &Provider{reader: reader}
 
 		// act

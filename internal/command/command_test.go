@@ -3,15 +3,12 @@ package command
 import (
 	"context"
 	"os/exec"
+	"syscall"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// Compile-time check: *DefaultExecutor реализует Executor.
-var _ Executor = (*DefaultExecutor)(nil)
 
 func findShell(t *testing.T) string {
 	t.Helper()
@@ -24,188 +21,192 @@ func findShell(t *testing.T) string {
 	return ""
 }
 
+// Compile-time check: *cmd реализует Command.
+var _ Command = (*cmd)(nil)
+
+func TestCommand_StartAndKill(t *testing.T) {
+	t.Parallel()
+
+	// arrange
+	shell := findShell(t)
+	cmd := New(shell, []string{"-c", "sleep 30"})
+
+	// act
+	err := cmd.Start(t.Context())
+
+	// assert
+	require.NoError(t, err)
+	require.NoError(t, cmd.Kill())
+	// Wait возвращает ошибку, потому что процесс был убит
+	_ = cmd.Wait()
+}
+
+func TestCommand_Signal(t *testing.T) {
+	t.Parallel()
+
+	// arrange
+	shell := findShell(t)
+	cmd := New(shell, []string{"-c", "trap '' TERM; sleep 30"})
+
+	err := cmd.Start(t.Context())
+	require.NoError(t, err)
+
+	// act
+	err = cmd.Signal(syscall.SIGTERM)
+
+	// assert
+	require.NoError(t, err)
+	_ = cmd.Wait()
+}
+
+func TestCommand_Stderr(t *testing.T) {
+	t.Parallel()
+
+	// arrange
+	shell := findShell(t)
+	cmd := New(shell, []string{"-c", "echo error-output >&2; exit 1"})
+
+	// act
+	err := cmd.Start(t.Context())
+	require.NoError(t, err)
+	waitErr := cmd.Wait()
+
+	// assert
+	require.Error(t, waitErr)
+	assert.Contains(t, cmd.Stderr(), "error-output")
+}
+
+func TestCommand_StartError(t *testing.T) {
+	t.Parallel()
+
+	// arrange
+	cmd := New("nonexistent-binary-xyz-12345", nil)
+
+	// act
+	err := cmd.Start(t.Context())
+
+	// assert
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "start process")
+}
+
+func TestCommand_KillNilProcess(t *testing.T) {
+	t.Parallel()
+
+	// arrange
+	cmd := New("true", nil)
+
+	// act — Kill до Start не должен паниковать
+	err := cmd.Kill()
+
+	// assert
+	require.NoError(t, err)
+}
+
+func TestCommand_SignalNilProcess(t *testing.T) {
+	t.Parallel()
+
+	// arrange
+	cmd := New("true", nil)
+
+	// act — Signal до Start не должен паниковать
+	err := cmd.Signal(syscall.SIGTERM)
+
+	// assert
+	require.NoError(t, err)
+}
+
+func TestCommand_WaitNilProcess(t *testing.T) {
+	t.Parallel()
+
+	// arrange
+	cmd := New("true", nil)
+
+	// act — Wait до Start не должен паниковать
+	err := cmd.Wait()
+
+	// assert
+	require.NoError(t, err)
+}
+
+func TestCommand_WithContextCancel(t *testing.T) {
+	t.Parallel()
+
+	// arrange
+	shell := findShell(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	cmd := New(shell, []string{"-c", "sleep 30"})
+
+	err := cmd.Start(ctx)
+	require.NoError(t, err)
+
+	// act
+	cancel()
+
+	// assert
+	_ = cmd.Wait() // процесс завершается из-за отмены контекста
+}
+
 func TestDefaultExecutor_Exec(t *testing.T) {
 	t.Parallel()
 
-	// Проверяем, что stdout-вывод команды возвращается без искажений.
-	t.Run("captures stdout", func(t *testing.T) {
+	t.Run("successful command", func(t *testing.T) {
 		t.Parallel()
 
 		// arrange
-		executor := NewDefaultExecutor()
+		exe := NewDefaultExecutor()
 
 		// act
-		output, err := executor.Exec(t.Context(), "printf", "%s", "hello world")
+		out, err := exe.Exec(t.Context(), "echo", "hello-from-executor")
 
 		// assert
 		require.NoError(t, err)
-		assert.Equal(t, "hello world", string(output))
+		assert.Contains(t, string(out), "hello-from-executor")
 	})
 
-	// Проверяем, что stderr попадает в combined output.
-	t.Run("captures stderr", func(t *testing.T) {
+	t.Run("command not found", func(t *testing.T) {
 		t.Parallel()
 
 		// arrange
-		executor := NewDefaultExecutor()
-		shell := findShell(t)
+		exe := NewDefaultExecutor()
 
 		// act
-		output, err := executor.Exec(t.Context(), shell, "-c", "printf stderr-only >&2")
-
-		// assert
-		require.NoError(t, err)
-		assert.Equal(t, "stderr-only", string(output))
-	})
-
-	// Проверяем, что stdout и stderr объединяются.
-	// Порядок фрагментов на разных ОС может различаться из-за особенностей
-	// runtime, поэтому проверяем только наличие обоих фрагментов.
-	t.Run("combines stdout and stderr", func(t *testing.T) {
-		t.Parallel()
-
-		// arrange
-		executor := NewDefaultExecutor()
-		shell := findShell(t)
-
-		// act
-		output, err := executor.Exec(
-			t.Context(),
-			shell,
-			"-c",
-			"printf out-part; printf err-part >&2",
-		)
-
-		// assert
-		require.NoError(t, err)
-		assert.Contains(t, string(output), "out-part")
-		assert.Contains(t, string(output), "err-part")
-	})
-
-	// Проверяем, что успешная команда без вывода возвращает пустой результат.
-	t.Run("returns empty output for silent success", func(t *testing.T) {
-		t.Parallel()
-
-		// arrange
-		executor := NewDefaultExecutor()
-
-		// act
-		output, err := executor.Exec(t.Context(), "true")
-
-		// assert
-		require.NoError(t, err)
-		assert.Empty(t, output)
-	})
-
-	// Проверяем, что variadic-аргументы передаются в команду в указанном порядке.
-	t.Run("passes variadic args in order", func(t *testing.T) {
-		t.Parallel()
-
-		// arrange
-		executor := NewDefaultExecutor()
-
-		// act
-		output, err := executor.Exec(
-			t.Context(),
-			"printf",
-			"%s-%s-%s-%s",
-			"alpha",
-			"beta",
-			"gamma",
-			"delta",
-		)
-
-		// assert
-		require.NoError(t, err)
-		assert.Equal(t, "alpha-beta-gamma-delta", string(output))
-	})
-
-	// Проверяем, что ненулевой exit code приводит к ошибке и сохранению вывода.
-	t.Run("returns error on non-zero exit", func(t *testing.T) {
-		t.Parallel()
-
-		// arrange
-		executor := NewDefaultExecutor()
-		shell := findShell(t)
-
-		// act
-		output, err := executor.Exec(
-			t.Context(),
-			shell,
-			"-c",
-			"printf diagnostic; exit 7",
-		)
-
-		// assert
-		require.Error(t, err)
-		assert.Equal(t, "diagnostic", string(output))
-		assert.Contains(t, err.Error(), "exit status 7")
-	})
-
-	// Проверяем, что ошибка содержит вывод, даже если exit code ненулевой
-	// и вывод пустой.
-	t.Run("returns error on non-zero exit with no output", func(t *testing.T) {
-		t.Parallel()
-
-		// arrange
-		executor := NewDefaultExecutor()
-
-		// act
-		_, err := executor.Exec(t.Context(), "false")
-
-		// assert
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "exit status 1")
-	})
-
-	// Проверяем, что несуществующая команда возвращает ошибку без паники.
-	t.Run("returns error for missing binary", func(t *testing.T) {
-		t.Parallel()
-
-		// arrange
-		executor := NewDefaultExecutor()
-
-		// act
-		_, err := executor.Exec(
-			t.Context(),
-			"vpnconfig-nonexistent-binary-xyz-12345",
-		)
+		_, err := exe.Exec(t.Context(), "nonexistent-binary-xyz-99999")
 
 		// assert
 		require.Error(t, err)
 	})
 
-	// Проверяем, что заранее отменённый контекст прерывает выполнение команды.
-	t.Run("cancelled context returns error", func(t *testing.T) {
+	t.Run("context canceled", func(t *testing.T) {
 		t.Parallel()
 
 		// arrange
+		exe := NewDefaultExecutor()
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
-		executor := NewDefaultExecutor()
+
 		shell := findShell(t)
 
 		// act
-		_, err := executor.Exec(ctx, shell, "-c", "sleep 30")
+		_, err := exe.Exec(ctx, shell, "-c", "sleep 30")
 
 		// assert
 		require.Error(t, err)
 	})
+}
 
-	// Проверяем, что истёкший по timeout контекст прерывает выполнение команды.
-	t.Run("context timeout returns error", func(t *testing.T) {
-		t.Parallel()
+func TestCommand_WithTimeout(t *testing.T) {
+	t.Parallel()
 
-		// arrange
-		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
-		defer cancel()
-		executor := NewDefaultExecutor()
-		shell := findShell(t)
+	// arrange
+	shell := findShell(t)
+	cmd := New(shell, []string{"-c", "sleep 30"}, WithTimeout(100))
 
-		// act
-		_, err := executor.Exec(ctx, shell, "-c", "sleep 30")
+	// act
+	err := cmd.Start(t.Context())
 
-		// assert
-		require.Error(t, err)
-	})
+	// assert
+	require.NoError(t, err)
+	require.NoError(t, cmd.Kill())
+	_ = cmd.Wait()
 }

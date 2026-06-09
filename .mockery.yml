@@ -6,6 +6,7 @@ packages:
       filename: zzz_mocks_test.go
     interfaces:
       Executor:
+      Command:
 
   github.com/denisdubovitskiy/vpnconfig/internal/singboxcli:
     config:
@@ -73,3 +74,27 @@ packages:
       VPNParser:
       ConfigStore:
       ConfigValidator:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/checker:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      Checker:
+      SingBoxRunner:
+      HttpDoer:
+      PortGenerator:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/portgen:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      Generator:
+
+  github.com/denisdubovitskiy/vpnconfig/internal/runner:
+    config:
+      filename: zzz_mocks_test.go
+    interfaces:
+      ProcessController:
+      SingBoxRunner:
+      Dialer:
+      Conn:

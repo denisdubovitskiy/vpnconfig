@@ -32,7 +32,8 @@ func TestUpdater_Run(t *testing.T) {
 		parser := NewMockVPNParser(t)
 		configStore := NewMockConfigStore(t)
 
-		fetcher.EXPECT().
+		fetcher.
+			EXPECT().
 			FetchLinks(mock.Anything, "https://example.com/links").
 			Return([]string{
 				"vless://uuid@192.0.2.1:8444",
@@ -40,11 +41,13 @@ func TestUpdater_Run(t *testing.T) {
 				"vmess://base64",
 			}, nil)
 
-		geoIP.EXPECT().
+		geoIP.
+			EXPECT().
 			CountryName(mock.Anything, "192.0.2.1").
 			Return("Netherlands", nil)
 
-		geoIP.EXPECT().
+		geoIP.
+			EXPECT().
 			CountryName(mock.Anything, "198.51.100.1").
 			Return("United States", nil)
 
@@ -53,7 +56,8 @@ func TestUpdater_Run(t *testing.T) {
 			Server:       "192.0.2.1",
 			ServerPort:   8444,
 		}
-		parser.EXPECT().
+		parser.
+			EXPECT().
 			Parse("vless://uuid@192.0.2.1:8444").
 			Return(vlessOutbound, nil)
 
@@ -62,27 +66,31 @@ func TestUpdater_Run(t *testing.T) {
 			Server:       "198.51.100.1",
 			ServerPort:   2058,
 		}
-		parser.EXPECT().
+		parser.
+			EXPECT().
 			Parse("trojan://pass@198.51.100.1:2058").
 			Return(trojanOutbound, nil)
 
 		singboxCfg := &singbox.Config{}
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			LoadConfig("./singbox.json").
 			Return(singboxCfg, nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			CreateBackup("./singbox.json").
 			Return("./singbox.json.backup_20260101_120000", nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			SaveConfig("./singbox.json", singboxCfg).
 			Return(nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
 			config.SourceTypeSubscription: fetcher,
 		}
-		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
+		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil, nil)
 
 		cfg := &config.Config{
 			SingboxConfig: "./singbox.json",
@@ -128,19 +136,21 @@ func TestUpdater_Run(t *testing.T) {
 		parser := NewMockVPNParser(t)
 		configStore := NewMockConfigStore(t)
 
-		fetcher.EXPECT().
+		fetcher.
+			EXPECT().
 			FetchLinks(mock.Anything, "https://example.com/links").
 			Return(nil, errors.New("network error"))
 
 		singboxCfg := &singbox.Config{}
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			LoadConfig(mock.Anything).
 			Return(singboxCfg, nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
 			config.SourceTypeSubscription: fetcher,
 		}
-		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
+		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil, nil)
 
 		cfg := &config.Config{
 			SingboxConfig: "./singbox.json",
@@ -174,26 +184,30 @@ func TestUpdater_Run(t *testing.T) {
 		parser := NewMockVPNParser(t)
 		configStore := NewMockConfigStore(t)
 
-		fetcher.EXPECT().
+		fetcher.
+			EXPECT().
 			FetchLinks(mock.Anything, mock.Anything).
 			Return([]string{"vless://uuid@192.0.2.1:8444"}, nil)
 
-		geoIP.EXPECT().
+		geoIP.
+			EXPECT().
 			CountryName(mock.Anything, mock.Anything).
 			Return("Netherlands", nil)
 
-		parser.EXPECT().
+		parser.
+			EXPECT().
 			Parse(mock.Anything).
 			Return(&vpnurl.VLESSOutbound{OutboundType: "vless"}, nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			LoadConfig("./singbox.json").
 			Return(nil, errors.New("file not found"))
 
 		fetchers := map[config.SourceType]LinkFetcher{
 			config.SourceTypeSubscription: fetcher,
 		}
-		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
+		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil, nil)
 
 		cfg := &config.Config{
 			SingboxConfig: "./singbox.json",
@@ -226,31 +240,36 @@ func TestUpdater_Run(t *testing.T) {
 		parser := NewMockVPNParser(t)
 		configStore := NewMockConfigStore(t)
 
-		fetcher.EXPECT().
+		fetcher.
+			EXPECT().
 			FetchLinks(mock.Anything, mock.Anything).
 			Return([]string{"vless://uuid@192.0.2.1:8444"}, nil)
 
-		geoIP.EXPECT().
+		geoIP.
+			EXPECT().
 			CountryName(mock.Anything, mock.Anything).
 			Return("Netherlands", nil)
 
-		parser.EXPECT().
+		parser.
+			EXPECT().
 			Parse(mock.Anything).
 			Return(&vpnurl.VLESSOutbound{OutboundType: "vless"}, nil)
 
 		singboxCfg := &singbox.Config{}
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			LoadConfig(mock.Anything).
 			Return(singboxCfg, nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			CreateBackup(mock.Anything).
 			Return("", errors.New("permission denied"))
 
 		fetchers := map[config.SourceType]LinkFetcher{
 			config.SourceTypeSubscription: fetcher,
 		}
-		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
+		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil, nil)
 
 		cfg := &config.Config{
 			SingboxConfig: "./singbox.json",
@@ -283,35 +302,41 @@ func TestUpdater_Run(t *testing.T) {
 		parser := NewMockVPNParser(t)
 		configStore := NewMockConfigStore(t)
 
-		fetcher.EXPECT().
+		fetcher.
+			EXPECT().
 			FetchLinks(mock.Anything, mock.Anything).
 			Return([]string{"vless://uuid@192.0.2.1:8444"}, nil)
 
-		geoIP.EXPECT().
+		geoIP.
+			EXPECT().
 			CountryName(mock.Anything, mock.Anything).
 			Return("Netherlands", nil)
 
-		parser.EXPECT().
+		parser.
+			EXPECT().
 			Parse(mock.Anything).
 			Return(&vpnurl.VLESSOutbound{OutboundType: "vless"}, nil)
 
 		singboxCfg := &singbox.Config{}
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			LoadConfig(mock.Anything).
 			Return(singboxCfg, nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			CreateBackup(mock.Anything).
 			Return("./backup", nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			SaveConfig(mock.Anything, mock.Anything).
 			Return(errors.New("disk full"))
 
 		fetchers := map[config.SourceType]LinkFetcher{
 			config.SourceTypeSubscription: fetcher,
 		}
-		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
+		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil, nil)
 
 		cfg := &config.Config{
 			SingboxConfig: "./singbox.json",
@@ -344,15 +369,18 @@ func TestUpdater_Run(t *testing.T) {
 		parser := NewMockVPNParser(t)
 		configStore := NewMockConfigStore(t)
 
-		fetcher.EXPECT().
+		fetcher.
+			EXPECT().
 			FetchLinks(mock.Anything, mock.Anything).
 			Return([]string{"vless://uuid@192.0.2.1:8444"}, nil)
 
-		geoIP.EXPECT().
+		geoIP.
+			EXPECT().
 			CountryName(mock.Anything, mock.Anything).
 			Return("Netherlands", nil)
 
-		parser.EXPECT().
+		parser.
+			EXPECT().
 			Parse(mock.Anything).
 			Return(&vpnurl.VLESSOutbound{OutboundType: "vless"}, nil)
 
@@ -361,7 +389,8 @@ func TestUpdater_Run(t *testing.T) {
 				{"type": "direct", "tag": "direct-out"},
 			},
 		}
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			LoadConfig(mock.Anything).
 			Return(singboxCfg, nil)
 
@@ -370,7 +399,7 @@ func TestUpdater_Run(t *testing.T) {
 		fetchers := map[config.SourceType]LinkFetcher{
 			config.SourceTypeSubscription: fetcher,
 		}
-		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
+		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil, nil)
 
 		cfg := &config.Config{
 			SingboxConfig: "./singbox.json",
@@ -405,38 +434,44 @@ func TestUpdater_Run(t *testing.T) {
 		parser := NewMockVPNParser(t)
 		configStore := NewMockConfigStore(t)
 
-		fetcher.EXPECT().
+		fetcher.
+			EXPECT().
 			FetchLinks(mock.Anything, mock.Anything).
 			Return([]string{
 				"vmess://base64encoded",
 				"vless://uuid@192.0.2.1:8444",
 			}, nil)
 
-		geoIP.EXPECT().
+		geoIP.
+			EXPECT().
 			CountryName(mock.Anything, "192.0.2.1").
 			Return("Netherlands", nil)
 
-		parser.EXPECT().
+		parser.
+			EXPECT().
 			Parse("vless://uuid@192.0.2.1:8444").
 			Return(&vpnurl.VLESSOutbound{OutboundType: "vless"}, nil)
 
 		singboxCfg := &singbox.Config{}
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			LoadConfig(mock.Anything).
 			Return(singboxCfg, nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			CreateBackup(mock.Anything).
 			Return("./backup", nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			SaveConfig(mock.Anything, mock.Anything).
 			Return(nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
 			config.SourceTypeSubscription: fetcher,
 		}
-		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
+		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil, nil)
 
 		cfg := &config.Config{
 			SingboxConfig: "./singbox.json",
@@ -471,27 +506,31 @@ func TestUpdater_Run(t *testing.T) {
 		parser := NewMockVPNParser(t)
 		configStore := NewMockConfigStore(t)
 
-		fetcher.EXPECT().
+		fetcher.
+			EXPECT().
 			FetchLinks(mock.Anything, mock.Anything).
 			Return([]string{"vless://uuid@192.0.2.1:8444"}, nil)
 
-		geoIP.EXPECT().
+		geoIP.
+			EXPECT().
 			CountryName(mock.Anything, mock.Anything).
 			Return("Netherlands", nil)
 
-		parser.EXPECT().
+		parser.
+			EXPECT().
 			Parse(mock.Anything).
 			Return(&vpnurl.VLESSOutbound{OutboundType: "vless"}, nil)
 
 		singboxCfg := &singbox.Config{}
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			LoadConfig(mock.Anything).
 			Return(singboxCfg, nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
 			config.SourceTypeSubscription: fetcher,
 		}
-		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
+		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil, nil)
 
 		cfg := &config.Config{
 			SingboxConfig: "./singbox.json",
@@ -525,35 +564,41 @@ func TestUpdater_Run(t *testing.T) {
 		parser := NewMockVPNParser(t)
 		configStore := NewMockConfigStore(t)
 
-		fetcher.EXPECT().
+		fetcher.
+			EXPECT().
 			FetchLinks(mock.Anything, mock.Anything).
 			Return([]string{"vless://uuid@192.0.2.1:8444"}, nil)
 
-		geoIP.EXPECT().
+		geoIP.
+			EXPECT().
 			CountryName(mock.Anything, mock.Anything).
 			Return("Netherlands", nil)
 
-		parser.EXPECT().
+		parser.
+			EXPECT().
 			Parse(mock.Anything).
 			Return(&vpnurl.VLESSOutbound{OutboundType: "vless"}, nil)
 
 		singboxCfg := &singbox.Config{}
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			LoadConfig(mock.Anything).
 			Return(singboxCfg, nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			CreateBackup(mock.Anything).
 			Return("./backup", nil)
 
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			SaveConfig(mock.Anything, mock.Anything).
 			Return(nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
 			config.SourceTypeSubscription: fetcher,
 		}
-		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
+		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil, nil)
 
 		customURL := "https://custom-url.com"
 		customInterval := "5m"
@@ -809,7 +854,7 @@ func TestParseIPFromVpnURL(t *testing.T) {
 func TestUpdater_CleanupCacheIfNeeded(t *testing.T) {
 	t.Parallel()
 
-	u := NewUpdater(nil, nil, nil, nil, nil, nil)
+	u := NewUpdater(nil, nil, nil, nil, nil, nil, nil)
 
 	// Проверяем очистку кэша при превышении размера.
 	t.Run("clears cache when size exceeds limit", func(t *testing.T) {
@@ -886,7 +931,7 @@ func TestUpdater_CreateBackup(t *testing.T) {
 		require.NoError(t, os.WriteFile(configPath, []byte("test config"), 0o644))
 
 		configStore := NewMockConfigStore(t)
-		u := NewUpdater(nil, nil, nil, nil, configStore, nil)
+		u := NewUpdater(nil, nil, nil, nil, configStore, nil, nil)
 
 		// act
 		backupPath, err := u.createBackup(configPath, backupDir)
@@ -906,11 +951,12 @@ func TestUpdater_CreateBackup(t *testing.T) {
 
 		// arrange
 		configStore := NewMockConfigStore(t)
-		configStore.EXPECT().
+		configStore.
+			EXPECT().
 			CreateBackup("./singbox.json").
 			Return("./singbox.json.backup_20260101_120000", nil)
 
-		u := NewUpdater(nil, nil, nil, nil, configStore, nil)
+		u := NewUpdater(nil, nil, nil, nil, configStore, nil, nil)
 
 		// act
 		backupPath, err := u.createBackup("./singbox.json", "")
@@ -924,7 +970,7 @@ func TestUpdater_CreateBackup(t *testing.T) {
 func TestUpdater_CleanupOldBackups(t *testing.T) {
 	t.Parallel()
 
-	u := NewUpdater(nil, nil, nil, nil, nil, nil)
+	u := NewUpdater(nil, nil, nil, nil, nil, nil, nil)
 
 	// Проверяем удаление старых бэкапов при превышении лимита.
 	t.Run("removes old backups when exceeding max", func(t *testing.T) {
@@ -997,7 +1043,7 @@ func TestUpdater_SaveConfigWithValidation(t *testing.T) {
 		configPath := filepath.Join(t.TempDir(), "singbox.json")
 		cfg := &singbox.Config{Outbounds: []singbox.Outbound{{"type": "direct", "tag": "out"}}}
 		store := &singbox.Store{}
-		u := NewUpdater(nil, nil, nil, nil, store, nil)
+		u := NewUpdater(nil, nil, nil, nil, store, nil, nil)
 
 		// act
 		err := u.saveConfigWithValidation(logger.IntoContext(t.Context(), logger.Silent()), configPath, cfg)
@@ -1022,11 +1068,12 @@ func TestUpdater_SaveConfigWithValidation(t *testing.T) {
 		cfg := &singbox.Config{Outbounds: []singbox.Outbound{{"type": "direct", "tag": "out"}}}
 		store := &singbox.Store{}
 		validator := NewMockConfigValidator(t)
-		validator.EXPECT().
+		validator.
+			EXPECT().
 			CheckConfig(mock.Anything, configPath+".tmp").
 			Return(nil)
 
-		u := NewUpdater(nil, nil, nil, nil, store, validator)
+		u := NewUpdater(nil, nil, nil, nil, store, validator, nil)
 
 		// act
 		err := u.saveConfigWithValidation(logger.IntoContext(t.Context(), logger.Silent()), configPath, cfg)
@@ -1052,11 +1099,12 @@ func TestUpdater_SaveConfigWithValidation(t *testing.T) {
 		store := &singbox.Store{}
 		wantErr := errors.New("invalid config")
 		validator := NewMockConfigValidator(t)
-		validator.EXPECT().
+		validator.
+			EXPECT().
 			CheckConfig(mock.Anything, configPath+".tmp").
 			Return(wantErr)
 
-		u := NewUpdater(nil, nil, nil, nil, store, validator)
+		u := NewUpdater(nil, nil, nil, nil, store, validator, nil)
 
 		// act
 		err := u.saveConfigWithValidation(logger.IntoContext(t.Context(), logger.Silent()), configPath, cfg)
@@ -1081,12 +1129,13 @@ func TestUpdater_SaveConfigWithValidation(t *testing.T) {
 		validator := NewMockConfigValidator(t)
 		// CheckConfig опционален: до валидации дело не дойдёт, но если
 		// поведение изменится, тест всё равно пройдёт.
-		validator.EXPECT().
+		validator.
+			EXPECT().
 			CheckConfig(mock.Anything, mock.Anything).
 			Return(nil).
 			Maybe()
 
-		u := NewUpdater(nil, nil, nil, nil, store, validator)
+		u := NewUpdater(nil, nil, nil, nil, store, validator, nil)
 
 		// act
 		err := u.saveConfigWithValidation(logger.IntoContext(t.Context(), logger.Silent()), configPath, cfg)

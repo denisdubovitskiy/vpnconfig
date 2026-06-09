@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/denisdubovitskiy/vpnconfig/internal/pkg/duration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -527,7 +528,7 @@ func TestConfig_Normalize(t *testing.T) {
 			MMDB: &MMDBConfig{
 				Enabled:      true,
 				DatabasePath: "/tmp/test.mmdb",
-				MaxAge:       Duration{Duration: 24 * time.Hour},
+				MaxAge:       duration.Duration{Duration: 24 * time.Hour},
 			},
 		}
 
@@ -595,7 +596,7 @@ func TestDuration_UnmarshalYAML(t *testing.T) {
 		node := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "1h30m"}
 
 		// act
-		var d Duration
+		var d duration.Duration
 		err := d.UnmarshalYAML(node)
 
 		// assert
@@ -611,7 +612,7 @@ func TestDuration_UnmarshalYAML(t *testing.T) {
 		node := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "not-a-duration"}
 
 		// act
-		var d Duration
+		var d duration.Duration
 		err := d.UnmarshalYAML(node)
 
 		// assert
@@ -628,7 +629,7 @@ func TestDuration_MarshalYAML(t *testing.T) {
 		t.Parallel()
 
 		// arrange
-		d := Duration{Duration: 5 * time.Minute}
+		d := duration.Duration{Duration: 5 * time.Minute}
 
 		// act
 		got, err := d.MarshalYAML()
@@ -672,5 +673,33 @@ sections:
 		require.NotNil(t, cfg.SingboxCLI)
 		assert.True(t, cfg.SingboxCLIEnabled())
 		assert.Equal(t, "/usr/local/bin/sing-box", cfg.SingboxCLI.CLIPath)
+	})
+}
+
+func TestConfig_CheckerEnabled(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil checker returns false", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := &Config{}
+
+		assert.False(t, cfg.CheckerEnabled())
+	})
+
+	t.Run("disabled checker returns false", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := &Config{Checker: &CheckerConfig{Enabled: false}}
+
+		assert.False(t, cfg.CheckerEnabled())
+	})
+
+	t.Run("enabled checker returns true", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := &Config{Checker: &CheckerConfig{Enabled: true}}
+
+		assert.True(t, cfg.CheckerEnabled())
 	})
 }

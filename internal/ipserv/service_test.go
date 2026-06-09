@@ -46,7 +46,8 @@ func TestCachedIPLookup_CountryByIP(t *testing.T) {
 
 		// arrange
 		lookup, mockLookup, storage := newTestCachedLookup(t)
-		mockLookup.EXPECT().
+		mockLookup.
+			EXPECT().
 			CountryByIP(mock.Anything, testIP).
 			Return(
 				&Location{
@@ -111,7 +112,8 @@ func TestCachedIPLookup_CountryByIP(t *testing.T) {
 				Timestamp: time.Now().Add(-2 * time.Hour),
 			},
 		})
-		mockLookup.EXPECT().
+		mockLookup.
+			EXPECT().
 			CountryByIP(mock.Anything, testIP).
 			Return(
 				&Location{
@@ -138,7 +140,8 @@ func TestCachedIPLookup_CountryByIP(t *testing.T) {
 		// arrange
 		wantErr := errors.New("api unavailable")
 		lookup, mockLookup, _ := newTestCachedLookup(t)
-		mockLookup.EXPECT().
+		mockLookup.
+			EXPECT().
 			CountryByIP(mock.Anything, testIP).
 			Return(nil, wantErr)
 
@@ -156,7 +159,8 @@ func TestCachedIPLookup_CountryByIP(t *testing.T) {
 
 		// arrange
 		lookup, mockLookup, _ := newTestCachedLookup(t)
-		mockLookup.EXPECT().
+		mockLookup.
+			EXPECT().
 			CountryByIP(mock.Anything, "").
 			Return(
 				&Location{
@@ -192,7 +196,8 @@ func TestCachedIPLookup_CountryByIP(t *testing.T) {
 				Timestamp: time.Now(),
 			},
 		})
-		mockLookup.EXPECT().
+		mockLookup.
+			EXPECT().
 			CountryByIP(mock.Anything, testIP).
 			Return(
 				&Location{
@@ -262,7 +267,8 @@ func TestCachedIPLookup_CountryName(t *testing.T) {
 
 		// arrange
 		lookup, mockLookup, _ := newTestCachedLookup(t)
-		mockLookup.EXPECT().
+		mockLookup.
+			EXPECT().
 			CountryByIP(mock.Anything, testIP).
 			Return(
 				&Location{
@@ -288,7 +294,8 @@ func TestCachedIPLookup_CountryName(t *testing.T) {
 		// arrange
 		wantErr := errors.New("api unavailable")
 		lookup, mockLookup, _ := newTestCachedLookup(t)
-		mockLookup.EXPECT().
+		mockLookup.
+			EXPECT().
 			CountryByIP(mock.Anything, testIP).
 			Return(nil, wantErr)
 

@@ -53,9 +53,12 @@ type ConfigValidator interface {
 	CheckConfig(ctx context.Context, configPath string) error
 }
 
+// LinkChecker проверяет работоспособность VPN-ссылки через локальный sing-box.
+type LinkChecker interface {
+	CheckLink(ctx context.Context, vlessLink string) error
+}
+
 // Updater обновляет sing-box конфигурацию на основе VPN-ссылок.
-// Логгер передаётся через context.Context (см. logger.IntoContext /
-// logger.FromContext) — отдельной зависимости или поля в структуре нет.
 type Updater struct {
 	fetchers    map[config.SourceType]LinkFetcher
 	dns         DNSResolver
@@ -63,10 +66,11 @@ type Updater struct {
 	parser      VPNParser
 	configStore ConfigStore
 	validator   ConfigValidator
+	checker     LinkChecker
 }
 
-// NewUpdater создаёт новый Updater. Логгер должен быть передан через
-// context.Context при вызове Run (см. logger.IntoContext).
+// NewUpdater создаёт новый Updater. checker может быть nil — тогда проверка
+// VPN-ссылок не выполняется.
 func NewUpdater(
 	fetchers map[config.SourceType]LinkFetcher,
 	dns DNSResolver,
@@ -74,6 +78,7 @@ func NewUpdater(
 	parser VPNParser,
 	configStore ConfigStore,
 	validator ConfigValidator,
+	checker LinkChecker,
 ) *Updater {
 	return &Updater{
 		fetchers:    fetchers,
@@ -82,6 +87,7 @@ func NewUpdater(
 		parser:      parser,
 		configStore: configStore,
 		validator:   validator,
+		checker:     checker,
 	}
 }
 
@@ -194,6 +200,20 @@ func (u *Updater) Run(ctx context.Context, cfg *config.Config) (*Result, error) 
 						"country", country,
 						"type", parsed.Type(),
 					)
+
+					if u.checker != nil {
+						if err := u.checker.CheckLink(ctx, l); err != nil {
+							log.Warn("skipping url: link check failed",
+								"url", truncateURL(l),
+								"ip", ip,
+								"country", country,
+								"reason", err.Error(),
+							)
+							skipped++
+							continue
+						}
+						log.Info("link check passed", "url", truncateURL(l))
+					}
 
 					countryURLs[country] = append(countryURLs[country], l)
 					parsedOutbounds[l] = outbound

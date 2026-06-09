@@ -85,7 +85,8 @@ func TestGenerator_RandomUserAgent(t *testing.T) {
 			testUA3 = "Mozilla/3.0"
 		)
 		mockRand := NewMockRand(t)
-		mockRand.EXPECT().
+		mockRand.
+			EXPECT().
 			IntN(3).
 			Return(1)
 
@@ -108,7 +109,8 @@ func TestGenerator_RandomUserAgent(t *testing.T) {
 
 		// arrange
 		mockRand := NewMockRand(t)
-		mockRand.EXPECT().
+		mockRand.
+			EXPECT().
 			IntN(5).
 			Return(0)
 

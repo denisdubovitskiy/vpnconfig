@@ -13,6 +13,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestClient_NewClient(t *testing.T) {
+	t.Parallel()
+
+	t.Run("uses default http client when nil", func(t *testing.T) {
+		t.Parallel()
+
+		client := NewClient(nil)
+
+		require.NotNil(t, client)
+		require.NotNil(t, client.http)
+	})
+}
+
 func TestClient_FetchLinks(t *testing.T) {
 	t.Parallel()
 
@@ -29,7 +42,8 @@ func TestClient_FetchLinks(t *testing.T) {
 		content := "vless://link1\nvmess://link2\n\n\ntrojan://link3\n"
 		encoded := base64.StdEncoding.EncodeToString([]byte(content))
 
-		mockDoer.EXPECT().
+		mockDoer.
+			EXPECT().
 			Do(mock.Anything).
 			Run(func(req *http.Request) {
 				require.Equal(t, http.MethodGet, req.Method)
@@ -68,7 +82,8 @@ func TestClient_FetchLinks(t *testing.T) {
 		mockDoer := NewMockDoer(t)
 		client := NewClient(mockDoer)
 
-		mockDoer.EXPECT().
+		mockDoer.
+			EXPECT().
 			Do(mock.Anything).
 			Return(nil, wantErr)
 
@@ -89,7 +104,8 @@ func TestClient_FetchLinks(t *testing.T) {
 		mockDoer := NewMockDoer(t)
 		client := NewClient(mockDoer)
 
-		mockDoer.EXPECT().
+		mockDoer.
+			EXPECT().
 			Do(mock.Anything).
 			Return(
 				&http.Response{
@@ -115,7 +131,8 @@ func TestClient_FetchLinks(t *testing.T) {
 		mockDoer := NewMockDoer(t)
 		client := NewClient(mockDoer)
 
-		mockDoer.EXPECT().
+		mockDoer.
+			EXPECT().
 			Do(mock.Anything).
 			Return(
 				&http.Response{
@@ -143,7 +160,8 @@ func TestClient_FetchLinks(t *testing.T) {
 
 		encoded := base64.StdEncoding.EncodeToString([]byte(""))
 
-		mockDoer.EXPECT().
+		mockDoer.
+			EXPECT().
 			Do(mock.Anything).
 			Return(
 				&http.Response{

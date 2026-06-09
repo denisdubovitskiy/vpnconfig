@@ -248,10 +248,16 @@ func TestDownloadFile(t *testing.T) {
 
 		// arrange
 		client := NewMockHTTPDoer(t)
-		client.EXPECT().Do(mock.Anything).Return(&http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader("mocked-payload")),
-		}, nil)
+		client.
+			EXPECT().
+			Do(mock.Anything).
+			Return(
+				&http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("mocked-payload")),
+				},
+				nil,
+			)
 
 		dir := t.TempDir()
 		destPath := filepath.Join(dir, "out.bin")
@@ -271,10 +277,16 @@ func TestDownloadFile(t *testing.T) {
 
 		// arrange
 		client := NewMockHTTPDoer(t)
-		client.EXPECT().Do(mock.Anything).Return(&http.Response{
-			StatusCode: http.StatusInternalServerError,
-			Body:       io.NopCloser(strings.NewReader("")),
-		}, nil)
+		client.
+			EXPECT().
+			Do(mock.Anything).
+			Return(
+				&http.Response{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader("")),
+				},
+				nil,
+			)
 
 		dir := t.TempDir()
 		destPath := filepath.Join(dir, "out.bin")
@@ -295,7 +307,10 @@ func TestDownloadFile(t *testing.T) {
 		// arrange
 		netErr := errors.New("connection refused")
 		client := NewMockHTTPDoer(t)
-		client.EXPECT().Do(mock.Anything).Return(nil, netErr)
+		client.
+			EXPECT().
+			Do(mock.Anything).
+			Return(nil, netErr)
 
 		dir := t.TempDir()
 		destPath := filepath.Join(dir, "out.bin")

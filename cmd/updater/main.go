@@ -8,6 +8,7 @@ import (
 	stdhttp "net/http"
 	"os"
 
+	"github.com/denisdubovitskiy/vpnconfig/internal/checker"
 	"github.com/denisdubovitskiy/vpnconfig/internal/command"
 	"github.com/denisdubovitskiy/vpnconfig/internal/config"
 	"github.com/denisdubovitskiy/vpnconfig/internal/http"
@@ -15,10 +16,12 @@ import (
 	"github.com/denisdubovitskiy/vpnconfig/internal/ipserv/mmdb"
 	"github.com/denisdubovitskiy/vpnconfig/internal/ipserv/providers"
 	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
+	"github.com/denisdubovitskiy/vpnconfig/internal/portgen"
 	"github.com/denisdubovitskiy/vpnconfig/internal/profile"
 	"github.com/denisdubovitskiy/vpnconfig/internal/profile/plaintext"
 	"github.com/denisdubovitskiy/vpnconfig/internal/profile/subscription"
 	"github.com/denisdubovitskiy/vpnconfig/internal/resolver"
+	"github.com/denisdubovitskiy/vpnconfig/internal/runner"
 	"github.com/denisdubovitskiy/vpnconfig/internal/singbox"
 	"github.com/denisdubovitskiy/vpnconfig/internal/singboxcli"
 	"github.com/denisdubovitskiy/vpnconfig/internal/updater"
@@ -96,6 +99,7 @@ func main() {
 		vpnurl.NewParser(),
 		&singbox.Store{},
 		newValidator(ctx, conf),
+		newLinkChecker(ctx, conf),
 	)
 
 	result, err := u.Run(ctx, conf)
@@ -178,6 +182,8 @@ func newValidator(ctx context.Context, cfg *config.Config) updater.ConfigValidat
 		return singboxcli.NewCLIChecker(cfg.SingboxCLI.CLIPath, command.NewDefaultExecutor())
 	}
 
+	log.Info("sing-box CLI validation disabled")
+
 	return singboxcli.NewNullChecker()
 }
 
@@ -200,4 +206,30 @@ func newDNSResolver(ctx context.Context, cfg *config.Config) (resolver.IPResolve
 	)
 
 	return resolver.New(opts...), nil
+}
+
+func newLinkChecker(ctx context.Context, cfg *config.Config) updater.LinkChecker {
+	log := logger.FromContext(ctx)
+
+	if !cfg.CheckerEnabled() {
+		log.Info("link checker disabled")
+		return nil
+	}
+
+	log.Info("link checker enabled")
+
+	sbRunner := runner.NewProcessRunner(cfg.Checker.SingBoxPath)
+	checkerCfg := checker.Config{
+		Enabled:      cfg.Checker.Enabled,
+		SingBoxPath:  cfg.Checker.SingBoxPath,
+		TmpDirectory: cfg.Checker.TmpDirectory,
+		Timeout:      cfg.Checker.Timeout.Duration,
+		URLs:         cfg.Checker.URLs,
+	}
+	return checker.NewChecker(
+		checkerCfg,
+		vpnurl.NewParser(),
+		sbRunner,
+		checker.WithPortGenerator(portgen.New()),
+	)
 }

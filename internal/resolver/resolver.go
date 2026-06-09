@@ -192,6 +192,9 @@ func ensurePort(host, defaultPort string) string {
 		return host
 	}
 	if strings.HasPrefix(host, "[") {
+		if strings.HasSuffix(host, "]") {
+			return host + ":" + defaultPort
+		}
 		if _, _, err := net.SplitHostPort(host); err == nil {
 			return host
 		}
