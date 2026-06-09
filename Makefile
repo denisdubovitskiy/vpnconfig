@@ -3,6 +3,8 @@
 # Переменные
 BINARY_NAME := updater
 BINARY_PATH := $(CURDIR)/cmd/updater/main.go
+CHECKER_BINARY_NAME := checker
+CHECKER_BINARY_PATH := $(CURDIR)/cmd/checker/main.go
 CONFIG_PATH := $(CURDIR)/config.yaml
 BUILD_DIR := $(CURDIR)/build
 
@@ -12,7 +14,7 @@ GOPROXY := direct
 # Настройки роутера (OpenWRT ARM64 - NanoPi)
 ROUTER_ARCH := linux/arm64
 
-.PHONY: help build build-router run dev test test-verbose test-race test-cover test-cover-html lint fmt vet check clean tidy update mocks install
+.PHONY: help build build-checker build-router run run-checker dev test test-verbose test-race test-cover test-cover-html lint fmt vet check clean tidy update mocks install
 
 help: ## Показать справку по командам
 	@echo "Доступные команды:"
@@ -31,6 +33,12 @@ build: ## Собрать бинарник в build/updater
 	GOPROXY=$(GOPROXY) go build -o $(BUILD_DIR)/$(BINARY_NAME) $(BINARY_PATH)
 	@echo "Готово: $(BUILD_DIR)/$(BINARY_NAME)"
 
+build-checker: ## Собрать бинарник checker в build/checker
+	@echo "Сборка $(CHECKER_BINARY_NAME)..."
+	@mkdir -p $(BUILD_DIR)
+	GOPROXY=$(GOPROXY) go build -o $(BUILD_DIR)/$(CHECKER_BINARY_NAME) $(CHECKER_BINARY_PATH)
+	@echo "Готово: $(BUILD_DIR)/$(CHECKER_BINARY_NAME)"
+
 build-router: ## Собрать для роутера OpenWRT (Linux ARM64, static)
 	@echo "Сборка для роутера ($(ROUTER_ARCH))..."
 	@mkdir -p $(BUILD_DIR)
@@ -43,6 +51,10 @@ build-router: ## Собрать для роутера OpenWRT (Linux ARM64, stat
 run: build ## Собрать и запустить updater
 	@echo "Запуск updater..."
 	@$(BUILD_DIR)/$(BINARY_NAME)
+
+run-checker: build-checker ## Собрать и запустить checker
+	@echo "Запуск checker..."
+	@$(BUILD_DIR)/$(CHECKER_BINARY_NAME) -config $(CURDIR)/example/checker_config.yaml
 
 dev: ## Запуст updater без сборки (go run)
 	@echo "Запуск в dev-режиме..."

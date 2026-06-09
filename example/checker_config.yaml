@@ -1,0 +1,51 @@
+# =============================================================================
+# checker — конфигурация для проверкиconnectivity VPN-ссылок
+# =============================================================================
+# Использование:
+#   go run ./cmd/checker/main.go -config checker_config.yaml
+#
+# Все поля опциональны. Минимальная конфигурация — пустой файл или
+# передача ссылок через флаги -vless/-links.
+
+# =============================================================================
+# Настройки sing-box
+# =============================================================================
+
+# Путь к утилите sing-box.
+# Если не указан — используется "sing-box" из PATH.
+# sing_box_path: "sing-box"
+
+# Максимальное время проверки одной ссылки.
+# Формат: Go duration string ("10s", "30s", "1m").
+# По умолчанию: 10s.
+# timeout: "10s"
+
+# URL для проверки connectivity через прокси.
+# По умолчанию: ["https://www.gstatic.com/generate_204"]
+# test_urls:
+#   - "https://www.gstatic.com/generate_204"
+#   - "https://cp.cloudflare.com"
+
+# =============================================================================
+# Источники VPN-ссылок
+# =============================================================================
+# Можно комбинировать несколько способов получения ссылок.
+# Все найденные ссылки будут проверены.
+
+# --- Способ 1: Inline ссылки ---
+# Укажите VLESS-ссылки прямо в конфиге.
+# links:
+#   - "vless://uuid@server1.example.com:443?encryption=none&security=reality&sni=example.com&fp=chrome&pbk=PUBLIC_KEY&sid=SHORT_ID&type=tcp#Server1"
+#   - "vless://uuid@server2.example.com:443?encryption=none&security=tls&sni=example.com#Server2"
+
+# --- Способ 2: Файл со ссылками ---
+# Укажите путь к текстовому файлу (одна ссылка на строку, # — комментарии).
+# links_file: "sandbox/files/links.txt"
+
+# --- Способ 3: Подписки ---
+# Укажите URL base64-encoded подписок. Ссылки будут загружены автоматически.
+# Поддерживаются vless://, trojan://, ss:// протоколы.
+# subscription_urls:
+#   - "https://somevpn.com/s/YOUR_SUBSCRIPTION_ID_1"
+#   - "https://anothervpn.com/s/YOUR_SUBSCRIPTION_ID_2"
+# subscription_url: "https://somevpn.com/s/YOUR_SUBSCRIPTION_ID"  # обратная совместимость
