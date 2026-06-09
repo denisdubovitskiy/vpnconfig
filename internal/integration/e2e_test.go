@@ -21,8 +21,8 @@ import (
 	"github.com/denisdubovitskiy/vpnconfig/internal/ipserv/providers"
 	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
 	"github.com/denisdubovitskiy/vpnconfig/internal/profile"
-	"github.com/denisdubovitskiy/vpnconfig/internal/profile/happ"
 	"github.com/denisdubovitskiy/vpnconfig/internal/profile/plaintext"
+	"github.com/denisdubovitskiy/vpnconfig/internal/profile/subscription"
 	"github.com/denisdubovitskiy/vpnconfig/internal/resolver"
 	"github.com/denisdubovitskiy/vpnconfig/internal/singbox"
 	"github.com/denisdubovitskiy/vpnconfig/internal/singboxcli"
@@ -64,7 +64,7 @@ type setupOpts struct {
 	Providers []string
 	// DNSResolvers задаёт кастомные DNS-резолверы. nil = net.DefaultResolver.
 	DNSResolvers []string
-	// SubLinks — ссылки, возвращаемые /sub/happ и /sub/plain.
+	// SubLinks — ссылки, возвращаемые /sub/subscription и /sub/plain.
 	SubLinks []string
 	// GeoByIP — маппинг IP -> страна (используется всеми провайдерами).
 	GeoByIP map[string]string
@@ -160,8 +160,8 @@ func (e *testEnv) buildUpdater(t *testing.T) *updater.Updater {
 	geoService := ipserv.NewCachedIPLookup(geoFallback, geoCache)
 
 	fetchers := map[config.SourceType]profile.LinkFetcher{
-		config.SourceTypeHapp:      happ.NewClient(e.client),
-		config.SourceTypePlaintext: plaintext.NewClient(e.client),
+		config.SourceTypeSubscription: subscription.NewClient(e.client),
+		config.SourceTypePlaintext:    plaintext.NewClient(e.client),
 	}
 
 	// DNS: либо net.DefaultResolver, либо цепочка с mock DNS.
@@ -216,7 +216,7 @@ func (e *testEnv) buildConfig(t *testing.T) *config.Config {
 				countrySweden, countryNetherlands, countryUSA, countryLithuania,
 			},
 			Sources: []config.Source{
-				{Type: config.SourceTypeHapp, URLs: []string{e.mock.URL() + "/sub/happ"}},
+				{Type: config.SourceTypeSubscription, URLs: []string{e.mock.URL() + "/sub/subscription"}},
 				{Type: config.SourceTypePlaintext, URLs: []string{e.mock.URL() + "/sub/plain"}},
 			},
 		},
@@ -224,7 +224,7 @@ func (e *testEnv) buildConfig(t *testing.T) *config.Config {
 			Name:      "MULTI_RU",
 			Countries: []string{countryRussia},
 			Sources: []config.Source{
-				{Type: config.SourceTypeHapp, URLs: []string{e.mock.URL() + "/sub/happ"}},
+				{Type: config.SourceTypeSubscription, URLs: []string{e.mock.URL() + "/sub/subscription"}},
 				{Type: config.SourceTypePlaintext, URLs: []string{e.mock.URL() + "/sub/plain"}},
 			},
 		},
@@ -289,7 +289,7 @@ func outboundByTag(t *testing.T, sb map[string]any, tag string) map[string]any {
 // Tests
 // =============================================================================
 
-// TestE2E_FullCycle — полный цикл обновления с happ/plaintext подписками
+// TestE2E_FullCycle — полный цикл обновления с subscription/plaintext подписками
 // и всеми 6 geo-провайдерами. Проверяет, что новые outbounds корректно
 // генерируются, старые удаляются, структура секций соответствует
 // эталону.
@@ -613,8 +613,8 @@ func TestE2E_DNSResolution(t *testing.T) {
 	geoCache := ipserv.NewFileCache(env.cachePath)
 	geoService := ipserv.NewCachedIPLookup(geoFallback, geoCache)
 	fetchers := map[config.SourceType]profile.LinkFetcher{
-		config.SourceTypeHapp:      happ.NewClient(env.client),
-		config.SourceTypePlaintext: plaintext.NewClient(env.client),
+		config.SourceTypeSubscription: subscription.NewClient(env.client),
+		config.SourceTypePlaintext:    plaintext.NewClient(env.client),
 	}
 
 	u := updater.NewUpdater(

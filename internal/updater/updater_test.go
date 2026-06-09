@@ -80,7 +80,7 @@ func TestUpdater_Run(t *testing.T) {
 			Return(nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
-			config.SourceTypeHapp: fetcher,
+			config.SourceTypeSubscription: fetcher,
 		}
 		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
 
@@ -96,7 +96,7 @@ func TestUpdater_Run(t *testing.T) {
 					Name:      "MULTI_WEST",
 					Countries: []string{"Netherlands", "United States"},
 					Sources: []config.Source{
-						{Type: config.SourceTypeHapp, URLs: []string{"https://example.com/links"}},
+						{Type: config.SourceTypeSubscription, URLs: []string{"https://example.com/links"}},
 					},
 				},
 			},
@@ -138,7 +138,7 @@ func TestUpdater_Run(t *testing.T) {
 			Return(singboxCfg, nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
-			config.SourceTypeHapp: fetcher,
+			config.SourceTypeSubscription: fetcher,
 		}
 		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
 
@@ -149,7 +149,7 @@ func TestUpdater_Run(t *testing.T) {
 					Name:      "MULTI_WEST",
 					Countries: []string{"Netherlands"},
 					Sources: []config.Source{
-						{Type: config.SourceTypeHapp, URLs: []string{"https://example.com/links"}},
+						{Type: config.SourceTypeSubscription, URLs: []string{"https://example.com/links"}},
 					},
 				},
 			},
@@ -191,7 +191,7 @@ func TestUpdater_Run(t *testing.T) {
 			Return(nil, errors.New("file not found"))
 
 		fetchers := map[config.SourceType]LinkFetcher{
-			config.SourceTypeHapp: fetcher,
+			config.SourceTypeSubscription: fetcher,
 		}
 		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
 
@@ -202,7 +202,7 @@ func TestUpdater_Run(t *testing.T) {
 					Name:      "MULTI_WEST",
 					Countries: []string{"Netherlands"},
 					Sources: []config.Source{
-						{Type: config.SourceTypeHapp, URLs: []string{"https://example.com/links"}},
+						{Type: config.SourceTypeSubscription, URLs: []string{"https://example.com/links"}},
 					},
 				},
 			},
@@ -248,7 +248,7 @@ func TestUpdater_Run(t *testing.T) {
 			Return("", errors.New("permission denied"))
 
 		fetchers := map[config.SourceType]LinkFetcher{
-			config.SourceTypeHapp: fetcher,
+			config.SourceTypeSubscription: fetcher,
 		}
 		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
 
@@ -259,7 +259,7 @@ func TestUpdater_Run(t *testing.T) {
 					Name:      "MULTI_WEST",
 					Countries: []string{"Netherlands"},
 					Sources: []config.Source{
-						{Type: config.SourceTypeHapp, URLs: []string{"https://example.com/links"}},
+						{Type: config.SourceTypeSubscription, URLs: []string{"https://example.com/links"}},
 					},
 				},
 			},
@@ -309,7 +309,7 @@ func TestUpdater_Run(t *testing.T) {
 			Return(errors.New("disk full"))
 
 		fetchers := map[config.SourceType]LinkFetcher{
-			config.SourceTypeHapp: fetcher,
+			config.SourceTypeSubscription: fetcher,
 		}
 		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
 
@@ -320,7 +320,7 @@ func TestUpdater_Run(t *testing.T) {
 					Name:      "MULTI_WEST",
 					Countries: []string{"Netherlands"},
 					Sources: []config.Source{
-						{Type: config.SourceTypeHapp, URLs: []string{"https://example.com/links"}},
+						{Type: config.SourceTypeSubscription, URLs: []string{"https://example.com/links"}},
 					},
 				},
 			},
@@ -368,7 +368,7 @@ func TestUpdater_Run(t *testing.T) {
 		// SaveConfig и CreateBackup не должны вызываться.
 
 		fetchers := map[config.SourceType]LinkFetcher{
-			config.SourceTypeHapp: fetcher,
+			config.SourceTypeSubscription: fetcher,
 		}
 		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
 
@@ -379,7 +379,7 @@ func TestUpdater_Run(t *testing.T) {
 					Name:      "MULTI_RU",
 					Countries: []string{"Russia"},
 					Sources: []config.Source{
-						{Type: config.SourceTypeHapp, URLs: []string{"https://example.com/links"}},
+						{Type: config.SourceTypeSubscription, URLs: []string{"https://example.com/links"}},
 					},
 				},
 			},
@@ -434,7 +434,7 @@ func TestUpdater_Run(t *testing.T) {
 			Return(nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
-			config.SourceTypeHapp: fetcher,
+			config.SourceTypeSubscription: fetcher,
 		}
 		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
 
@@ -445,7 +445,7 @@ func TestUpdater_Run(t *testing.T) {
 					Name:      "MULTI_WEST",
 					Countries: []string{"Netherlands"},
 					Sources: []config.Source{
-						{Type: config.SourceTypeHapp, URLs: []string{"https://example.com/links"}},
+						{Type: config.SourceTypeSubscription, URLs: []string{"https://example.com/links"}},
 					},
 				},
 			},
@@ -489,7 +489,7 @@ func TestUpdater_Run(t *testing.T) {
 			Return(singboxCfg, nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
-			config.SourceTypeHapp: fetcher,
+			config.SourceTypeSubscription: fetcher,
 		}
 		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
 
@@ -500,7 +500,7 @@ func TestUpdater_Run(t *testing.T) {
 					Name:      "MULTI_RU",
 					Countries: []string{"Russia"},
 					Sources: []config.Source{
-						{Type: config.SourceTypeHapp, URLs: []string{"https://example.com/links"}},
+						{Type: config.SourceTypeSubscription, URLs: []string{"https://example.com/links"}},
 					},
 				},
 			},
@@ -551,7 +551,7 @@ func TestUpdater_Run(t *testing.T) {
 			Return(nil)
 
 		fetchers := map[config.SourceType]LinkFetcher{
-			config.SourceTypeHapp: fetcher,
+			config.SourceTypeSubscription: fetcher,
 		}
 		updater := NewUpdater(fetchers, nil, geoIP, parser, configStore, nil)
 
@@ -571,7 +571,7 @@ func TestUpdater_Run(t *testing.T) {
 					Name:      "MULTI_WEST",
 					Countries: []string{"Netherlands"},
 					Sources: []config.Source{
-						{Type: config.SourceTypeHapp, URLs: []string{"https://example.com/links"}},
+						{Type: config.SourceTypeSubscription, URLs: []string{"https://example.com/links"}},
 					},
 					URLTest: &config.URLTestDefaults{
 						URL:       customURL,

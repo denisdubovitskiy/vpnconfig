@@ -14,7 +14,7 @@ packages:
       ConfigValidator:
       CommandExecutor:
 
-  github.com/denisdubovitskiy/vpnconfig/internal/profile/happ:
+  github.com/denisdubovitskiy/vpnconfig/internal/profile/subscription:
     config:
       filename: zzz_mocks_test.go
     interfaces:

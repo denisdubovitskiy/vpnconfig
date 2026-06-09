@@ -16,8 +16,8 @@ import (
 	"github.com/denisdubovitskiy/vpnconfig/internal/ipserv/providers"
 	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
 	"github.com/denisdubovitskiy/vpnconfig/internal/profile"
-	"github.com/denisdubovitskiy/vpnconfig/internal/profile/happ"
 	"github.com/denisdubovitskiy/vpnconfig/internal/profile/plaintext"
+	"github.com/denisdubovitskiy/vpnconfig/internal/profile/subscription"
 	"github.com/denisdubovitskiy/vpnconfig/internal/resolver"
 	"github.com/denisdubovitskiy/vpnconfig/internal/singbox"
 	"github.com/denisdubovitskiy/vpnconfig/internal/singboxcli"
@@ -79,8 +79,8 @@ func main() {
 	}
 
 	fetchers := map[config.SourceType]profile.LinkFetcher{
-		config.SourceTypeHapp:      happ.NewClient(httpClient),
-		config.SourceTypePlaintext: plaintext.NewClient(httpClient),
+		config.SourceTypeSubscription: subscription.NewClient(httpClient),
+		config.SourceTypePlaintext:    plaintext.NewClient(httpClient),
 	}
 
 	dnsResolver, err := newDNSResolver(ctx, conf)

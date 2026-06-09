@@ -1,7 +1,6 @@
 # vpnconfig
 
-Автоматический обовлятор конфигурации sing-box на основе мультиссылок сервиса
-[hynet.space](https://hynet.space).
+Автоматический обовлятор конфигурации sing-box на основе подписок vless.
 
 ## Назначение
 
@@ -13,7 +12,7 @@
 список VPN-серверов разных типов (VLESS, Trojan, Shadowsocks). Помимо этого
 поддерживаются и обычные текстовые подписки. Этот инструмент:
 
-1. Загружает список серверов из настроенных источников (happ/plaintext)
+1. Загружает список серверов из настроенных источников (subscription/plaintext)
 2. Определяет страну каждого сервера по IP-адресу
 3. Группирует серверы по странам
 4. Обновляет секции конфигурации sing-box типа URLTest, созданные через интерфейс podkop
@@ -25,8 +24,8 @@
 
 ```
 1. Загрузка ссылок из настроенных источников каждой секции
-   ├─ happ      — base64-encoded подписка hynet.space
-   └─ plaintext — plain text подписка (одна ссылка на строку)
+   ├─ subscription — base64-encoded подписка
+   └─ plaintext    — plain text подписка (одна ссылка на строку)
 
 2. Обработка каждой ссылки:
    ├─ Извлечение IP-адреса из VPN-URL
@@ -107,7 +106,7 @@ sections:
       - "United States"
       - "Sweden"
     sources:
-      - type: happ
+      - type: subscription
         urls:
           - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_1"
           - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_2"
@@ -118,7 +117,7 @@ sections:
     countries:
       - "Russia"
     sources:
-      - type: happ
+      - type: subscription
         urls:
           - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_RU"
       - type: plaintext
@@ -336,7 +335,7 @@ sections:
       - "United States"
       - "Sweden"
     sources:
-      - type: happ
+      - type: subscription
         urls:
           - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_1"
           - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_2"
@@ -363,7 +362,7 @@ sections:
 
 | Поле | Тип | Описание |
 |------|-----|----------|
-| `type` | string | Тип источника: `happ` (base64 подписка) или `plaintext` (текст) |
+| `type` | string | Тип источника: `subscription` (base64 подписка) или `plaintext` (текст) |
 | `urls` | array | Список URL подписок (минимум 1) |
 
 Один и тот же URL может встречаться в нескольких секциях — он будет
@@ -427,7 +426,7 @@ vpnconfig_20260115_154511.log
 
 ```
 time=2026-01-15T14:30:22.123+04:00 level=INFO msg="starting update cycle" cache_path=./cache.json singbox_config=./singbox.json sections_count=2
-time=2026-01-15T14:30:22.234+04:00 level=INFO msg="fetching links from source" section=MULTI_WEST type=happ url=https://hynet.space/s/ID_1
+time=2026-01-15T14:30:22.234+04:00 level=INFO msg="fetching links from source" section=MULTI_WEST type=subscription url=https://hynet.space/s/ID_1
 time=2026-01-15T14:30:22.456+04:00 level=INFO msg="fetching links from source" section=MULTI_WEST type=plaintext url=https://raw.githubusercontent.com/.../vless.txt
 time=2026-01-15T14:30:22.789+04:00 level=INFO msg="parsed url successfully" ip=185.189.46.17 country=Sweden type=vless
 time=2026-01-15T14:30:22.790+04:00 level=WARN msg="skipping url: failed to extract IP" url=vmess://... reason="vmess is not supported"
@@ -473,8 +472,8 @@ internal/
 │   └── config.go                # Загрузка конфигурации YAML
 ├── profile/
 │   ├── profile.go               # Общий интерфейс LinkFetcher
-│   ├── happ/
-│   │   └── client.go            # Клиент hynet.space (base64)
+│   ├── subscription/
+│   │   └── client.go            # Клиент base64-encoded подписок
 │   └── plaintext/
 │       └── client.go            # Клиент для plain text подписок
 ├── resolver/
@@ -517,7 +516,7 @@ internal/
 
 | Тип | Пакет | Описание |
 |-----|-------|----------|
-| `happ` | `internal/profile/happ` | Base64-encoded подписка (формат hynet.space). Декодирует ответ, разбивает по строкам. |
+| `subscription` | `internal/profile/subscription` | Base64-encoded подписка. Декодирует ответ, разбивает по строкам. |
 | `plaintext` | `internal/profile/plaintext` | Plain text подписка: одна VPN-ссылка на строку. Пустые строки игнорируются. |
 
 Все типы реализуют общий интерфейс `profile.LinkFetcher` с методом

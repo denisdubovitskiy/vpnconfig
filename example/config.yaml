@@ -78,8 +78,8 @@ sections:
       - "Sweden"
     # Источники VPN-ссылок. Каждый источник имеет тип и список URL.
     sources:
-      # happ — base64-encoded подписка hynet.space
-      - type: happ
+      # subscription — base64-encoded подписка
+      - type: subscription
         urls:
           - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_1"
           - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_2"
@@ -100,12 +100,12 @@ sections:
     countries:
       - "Russia"
     sources:
-      - type: happ
+      - type: subscription
         urls:
-          - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_RU"
+          - "https://somehost.com/s/YOUR_SUBSCRIPTION_ID"
       - type: plaintext
         urls:
-          - "https://raw.githubusercontent.com/user/vpn-configs/main/ru/vless_ru.txt"
+          - "https://somehost.com/s/YOUR_SUBSCRIPTION_ID"
 
 # =============================================================================
 # [ОПЦИОНАЛЬНО] Провайдеры для определения страны по IP

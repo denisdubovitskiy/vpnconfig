@@ -1,4 +1,4 @@
-package happ
+package subscription
 
 import (
 	"encoding/base64"

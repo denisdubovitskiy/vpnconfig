@@ -1,4 +1,4 @@
-package happ
+package subscription
 
 import (
 	"bufio"
@@ -21,13 +21,13 @@ type Doer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// Client получает список ссылок из hynet.space.
+// Client получает список ссылок из base64-encoded подписки.
 type Client struct {
 	// http — HTTP-клиент для выполнения запросов.
 	http Doer
 }
 
-// NewClient создаёт новый клиент для hynet.space.
+// NewClient создаёт новый клиент для base64-encoded подписок.
 func NewClient(httpClient Doer) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{
@@ -40,7 +40,7 @@ func NewClient(httpClient Doer) *Client {
 	}
 }
 
-// FetchLinks выполняет запрос к hynet.space и возвращает список ссылок.
+// FetchLinks выполняет запрос и возвращает список ссылок.
 // Ответ декодируется из base64, каждая строка — отдельная ссылка.
 func (c *Client) FetchLinks(ctx context.Context, url string) ([]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)

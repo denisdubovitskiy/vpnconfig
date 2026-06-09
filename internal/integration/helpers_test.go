@@ -50,7 +50,7 @@ func newMockHTTPServer(t *testing.T) *mockHTTPServer {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/sub/happ", m.handleHappSub)
+	mux.HandleFunc("/sub/subscription", m.handleSubscriptionSub)
 	mux.HandleFunc("/sub/plain", m.handlePlainSub)
 	mux.HandleFunc("/", m.handleGeo) // fallback — все geo-провайдеры
 
@@ -73,7 +73,7 @@ func (m *mockHTTPServer) setGeo(ip, country string) {
 }
 
 // setSubscriptionLinks задаёт список VPN-ссылок, которые вернут
-// /sub/happ и /sub/plain.
+// /sub/subscription и /sub/plain.
 func (m *mockHTTPServer) setSubscriptionLinks(links []string) {
 	m.hitsMu.Lock()
 	defer m.hitsMu.Unlock()
@@ -252,8 +252,8 @@ func extractFromRequest(origHost string, r *http.Request) (provider, ip string, 
 
 // --- Subscription handlers ---
 
-func (m *mockHTTPServer) handleHappSub(w http.ResponseWriter, r *http.Request) {
-	m.recordHit("sub_happ", "", http.StatusOK)
+func (m *mockHTTPServer) handleSubscriptionSub(w http.ResponseWriter, r *http.Request) {
+	m.recordHit("sub_subscription", "", http.StatusOK)
 	w.Header().Set("Content-Type", "text/plain")
 	_, _ = io.WriteString(w, base64Std(m.snapshotSubLinks()))
 }

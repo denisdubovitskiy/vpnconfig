@@ -29,9 +29,9 @@ sections:
       - "Germany"
       - "France"
     sources:
-      - type: happ
+      - type: subscription
         urls:
-          - "https://example.com/happ"
+          - "https://example.com/subscription"
 `)
 		err := os.WriteFile(path, data, 0o644)
 		require.NoError(t, err)
@@ -46,8 +46,8 @@ sections:
 		assert.Equal(t, "Europe", cfg.Sections[0].Name)
 		assert.Equal(t, []string{"Germany", "France"}, cfg.Sections[0].Countries)
 		require.Len(t, cfg.Sections[0].Sources, 1)
-		assert.Equal(t, SourceTypeHapp, cfg.Sections[0].Sources[0].Type)
-		assert.Equal(t, []string{"https://example.com/happ"}, cfg.Sections[0].Sources[0].URLs)
+		assert.Equal(t, SourceTypeSubscription, cfg.Sections[0].Sources[0].Type)
+		assert.Equal(t, []string{"https://example.com/subscription"}, cfg.Sections[0].Sources[0].URLs)
 	})
 
 	// Проверяем ошибку при отсутствии файла.
@@ -95,9 +95,9 @@ sections:
   - name: "Europe"
     countries: ["Germany"]
     sources:
-      - type: happ
+      - type: subscription
         urls:
-          - "https://example.com/happ"
+          - "https://example.com/subscription"
 `)
 		require.NoError(t, os.WriteFile(path, data, 0o644))
 
@@ -126,9 +126,9 @@ sections:
   - name: "Europe"
     countries: ["Germany"]
     sources:
-      - type: happ
+      - type: subscription
         urls:
-          - "https://example.com/happ"
+          - "https://example.com/subscription"
 `)
 		require.NoError(t, os.WriteFile(path, data, 0o644))
 
@@ -296,7 +296,7 @@ func TestConfig_Validate(t *testing.T) {
 					Name:      "MULTI_WEST",
 					Countries: []string{"Netherlands"},
 					Sources: []Source{
-						{Type: SourceTypeHapp, URLs: []string{}},
+						{Type: SourceTypeSubscription, URLs: []string{}},
 					},
 				},
 			},
@@ -318,7 +318,7 @@ func TestConfig_Validate(t *testing.T) {
 					Name:      "MULTI_WEST",
 					Countries: []string{"Netherlands"},
 					Sources: []Source{
-						{Type: SourceTypeHapp, URLs: []string{"https://example.com/happ"}},
+						{Type: SourceTypeSubscription, URLs: []string{"https://example.com/subscription"}},
 						{Type: SourceTypePlaintext, URLs: []string{"https://example.com/plaintext"}},
 					},
 				},
@@ -431,9 +431,9 @@ sections:
   - name: "Europe"
     countries: ["Germany"]
     sources:
-      - type: happ
+      - type: subscription
         urls:
-          - "https://example.com/happ"
+          - "https://example.com/subscription"
 `)
 		require.NoError(t, os.WriteFile(path, data, 0o644))
 
@@ -461,9 +461,9 @@ sections:
   - name: "Europe"
     countries: ["Germany"]
     sources:
-      - type: happ
+      - type: subscription
         urls:
-          - "https://example.com/happ"
+          - "https://example.com/subscription"
 `)
 		require.NoError(t, os.WriteFile(path, data, 0o644))
 
@@ -491,9 +491,9 @@ sections:
   - name: "Europe"
     countries: ["Germany"]
     sources:
-      - type: happ
+      - type: subscription
         urls:
-          - "https://example.com/happ"
+          - "https://example.com/subscription"
 `)
 		require.NoError(t, os.WriteFile(path, data, 0o644))
 
@@ -658,9 +658,9 @@ sections:
   - name: "Europe"
     countries: ["Germany"]
     sources:
-      - type: happ
+      - type: subscription
         urls:
-          - "https://example.com/happ"
+          - "https://example.com/subscription"
 `)
 		require.NoError(t, os.WriteFile(path, data, 0o644))
 

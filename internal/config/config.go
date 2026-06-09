@@ -59,15 +59,15 @@ type MMDBConfig struct {
 type SourceType string
 
 const (
-	// SourceTypeHapp — base64-encoded подписка hynet.space.
-	SourceTypeHapp SourceType = "happ"
+	// SourceTypeSubscription — base64-encoded подписка.
+	SourceTypeSubscription SourceType = "subscription"
 	// SourceTypePlaintext — plain text подписка (одна ссылка на строку).
 	SourceTypePlaintext SourceType = "plaintext"
 )
 
 // Source описывает один источник VPN-ссылок.
 type Source struct {
-	// Type — тип источника (happ или plaintext).
+	// Type — тип источника (subscription или plaintext).
 	Type SourceType `yaml:"type"`
 	// URLs — список URL для получения ссылок.
 	URLs []string `yaml:"urls"`
@@ -181,8 +181,8 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("section %q must have at least one source", section.Name)
 		}
 		for _, source := range section.Sources {
-			if source.Type != SourceTypeHapp && source.Type != SourceTypePlaintext {
-				return fmt.Errorf("section %q: unknown source type %q (available: happ, plaintext)", section.Name, source.Type)
+			if source.Type != SourceTypeSubscription && source.Type != SourceTypePlaintext {
+				return fmt.Errorf("section %q: unknown source type %q (available: subscription, plaintext)", section.Name, source.Type)
 			}
 			if len(source.URLs) == 0 {
 				return fmt.Errorf("section %q: source type %q must have at least one URL", section.Name, source.Type)
