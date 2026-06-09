@@ -8,7 +8,7 @@
 [sing-box](https://sing-box.sagernet.org/) на роутерах с OpenWRT, где sing-box
 управляется плагином [podkop](https://podkop.net/).
 
-Сервис hynet.space предоставляет мультиссылки (subscription URLs), содержащие
+Многие сервисы предоставляют мультиссылки (subscription URLs), содержащие
 список VPN-серверов разных типов (VLESS, Trojan, Shadowsocks). Помимо этого
 поддерживаются и обычные текстовые подписки. Этот инструмент:
 
@@ -108,8 +108,8 @@ sections:
     sources:
       - type: subscription
         urls:
-          - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_1"
-          - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_2"
+          - "https://somevpn.com/s/YOUR_SUBSCRIPTION_ID_1"
+          - "https://somevpn.com/s/YOUR_SUBSCRIPTION_ID_2"
       - type: plaintext
         urls:
           - "https://raw.githubusercontent.com/user/repo/main/west/vless.txt"
@@ -119,7 +119,7 @@ sections:
     sources:
       - type: subscription
         urls:
-          - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_RU"
+          - "https://somevpn.com/s/YOUR_SUBSCRIPTION_ID_RU"
       - type: plaintext
         urls:
           - "https://raw.githubusercontent.com/user/repo/main/ru/vless_ru.txt"
@@ -392,8 +392,8 @@ sections:
     sources:
       - type: subscription
         urls:
-          - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_1"
-          - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_2"
+          - "https://somevpn.com/s/YOUR_SUBSCRIPTION_ID_1"
+          - "https://somevpn.com/s/YOUR_SUBSCRIPTION_ID_2"
       - type: plaintext
         urls:
           - "https://raw.githubusercontent.com/user/repo/main/west/vless.txt"
@@ -481,7 +481,7 @@ vpnconfig_20260115_154511.log
 
 ```
 time=2026-01-15T14:30:22.123+04:00 level=INFO msg="starting update cycle" cache_path=./cache.json singbox_config=./singbox.json sections_count=2
-time=2026-01-15T14:30:22.234+04:00 level=INFO msg="fetching links from source" section=MULTI_WEST type=subscription url=https://hynet.space/s/ID_1
+time=2026-01-15T14:30:22.234+04:00 level=INFO msg="fetching links from source" section=MULTI_WEST type=subscription url=https://somevpn.com/s/ID_1
 time=2026-01-15T14:30:22.456+04:00 level=INFO msg="fetching links from source" section=MULTI_WEST type=plaintext url=https://raw.githubusercontent.com/.../vless.txt
 time=2026-01-15T14:30:22.789+04:00 level=INFO msg="parsed url successfully" ip=185.189.46.17 country=Sweden type=vless
 time=2026-01-15T14:30:22.790+04:00 level=WARN msg="skipping url: failed to extract IP" url=vmess://... reason="vmess is not supported"
@@ -619,7 +619,7 @@ internal/
 
 **Mock-инфраструктура:**
 
-- `mockHTTPServer` — in-process HTTP-сервер, имитирующий hynet.space и все
+- `mockHTTPServer` — in-process HTTP-сервер, имитирующий somevpn.com и все
   6 geo-провайдеров. Диспетчеризация по `X-Original-Host`.
 - `dnsServer` — минимальный UDP DNS-сервер по RFC 1035, совместимый
   с `plainResolver` в `internal/resolver`.

@@ -81,8 +81,8 @@ sections:
       # subscription — base64-encoded подписка
       - type: subscription
         urls:
-          - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_1"
-          - "https://hynet.space/s/YOUR_SUBSCRIPTION_ID_2"
+          - "https://somevpn.com/s/YOUR_SUBSCRIPTION_ID_1"
+          - "https://somevpn.com/s/YOUR_SUBSCRIPTION_ID_2"
       # plaintext — plain text подписка (одна ссылка на строку)
       - type: plaintext
         urls:
