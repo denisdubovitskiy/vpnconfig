@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/ncruces/go-dns"
+
+	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
 )
 
 // IPResolver резолвит доменное имя в список IP-адресов.
@@ -112,14 +114,20 @@ func OptionsFromURLs(urls []string) ([]Option, error) {
 // Сигнатура совпадает с *net.Resolver.LookupIP, поэтому *Resolver
 // можно использовать везде, где ожидается *net.Resolver.
 func (r *Resolver) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
+	log := logger.FromContext(ctx)
+
 	if r == nil || len(r.chain) == 0 {
 		return nil, errors.New("no dns resolvers configured")
 	}
 
 	var lastErr error
 	for _, resolver := range r.chain {
+		resolverType := fmt.Sprintf("%T", resolver)
+		log.Debug("trying dns resolver", "host", host, "resolver_type", resolverType)
+
 		ips, err := resolver.LookupIP(ctx, network, host)
 		if err != nil {
+			log.Warn("dns resolver failed", "host", host, "error", err.Error())
 			lastErr = err
 			continue
 		}
@@ -127,9 +135,12 @@ func (r *Resolver) LookupIP(ctx context.Context, network, host string) ([]net.IP
 			lastErr = fmt.Errorf("resolver returned no addresses for %s", host)
 			continue
 		}
+
+		log.Debug("dns resolver succeeded", "host", host, "ips", len(ips))
 		return ips, nil
 	}
 
+	log.Warn("all dns resolvers failed", "host", host)
 	if lastErr != nil {
 		return nil, fmt.Errorf("all dns resolvers failed: %w", lastErr)
 	}

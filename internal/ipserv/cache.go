@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
 )
 
 // Storage определяет интерфейс для чтения и записи кеша.
@@ -137,14 +139,19 @@ func (c *CachedIPLookup) CountryName(ctx context.Context, ip string) (string, er
 // CountryByIP возвращает название страны для заданного IP.
 // Сначала проверяет кеш, если нет — делегирует provider, затем сохраняет результат.
 func (c *CachedIPLookup) CountryByIP(ctx context.Context, ip string) (*Location, error) {
+	log := logger.FromContext(ctx)
+
 	// Проверяем кеш.
 	if entry, ok := c.readCache(ip); ok {
+		log.Debug("geo cache hit", "ip", ip, "country", entry.Country)
 		return &Location{
 			Status:  "success",
 			Country: entry.Country,
 			Query:   ip,
 		}, nil
 	}
+
+	log.Debug("geo cache miss", "ip", ip)
 
 	// Делаем запрос к провайдеру.
 	loc, err := c.provider.CountryByIP(ctx, ip)
@@ -154,8 +161,8 @@ func (c *CachedIPLookup) CountryByIP(ctx context.Context, ip string) (*Location,
 
 	// Сохраняем в кеш.
 	if err := c.writeCache(ip, loc.Country); err != nil {
+		log.Warn("failed to write geo cache", "ip", ip, "error", err.Error())
 		// Ошибка записи кеша не критична — просто возвращаем результат.
-		//nolint:nilerr // намеренно проглатываем ошибку кеширования.
 		return loc, nil
 	}
 

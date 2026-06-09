@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/denisdubovitskiy/vpnconfig/internal/command"
+	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
 )
 
 // Константы по умолчанию для запуска sing-box.
@@ -137,6 +138,8 @@ func NewProcessRunner(cliPath string, opts ...Option) SingBoxRunner {
 }
 
 func (r *processRunner) Start(ctx context.Context, configPath string, port int) error {
+	log := logger.FromContext(ctx)
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -149,11 +152,15 @@ func (r *processRunner) Start(ctx context.Context, configPath string, port int) 
 		cli = defaultCLIPath
 	}
 
+	log.Debug("starting sing-box process", "config", configPath, "port", port)
+
 	cmd := r.factory(cli, []string{"run", "-c", configPath})
 
 	if err := cmd.Start(ctx); err != nil {
+		log.Warn("sing-box start failed", "error", err.Error())
 		return fmt.Errorf("start sing-box: %w", err)
 	}
+	log.Debug("sing-box process started")
 
 	if err := r.waitForReady(ctx, port); err != nil {
 		_ = cmd.Kill()
@@ -168,7 +175,9 @@ func (r *processRunner) Start(ctx context.Context, configPath string, port int) 
 	return nil
 }
 
-func (r *processRunner) Stop(_ context.Context) error {
+func (r *processRunner) Stop(ctx context.Context) error {
+	log := logger.FromContext(ctx)
+
 	r.mu.Lock()
 	cmd := r.cmd
 	gracePeriod := r.stopGracePeriod
@@ -179,6 +188,7 @@ func (r *processRunner) Stop(_ context.Context) error {
 		return nil
 	}
 
+	log.Debug("stopping sing-box process")
 	_ = cmd.Signal(os.Interrupt)
 
 	done := make(chan struct{})
@@ -189,10 +199,12 @@ func (r *processRunner) Stop(_ context.Context) error {
 
 	select {
 	case <-done:
+		log.Debug("sing-box process stopped")
 		return nil
 	case <-time.After(gracePeriod):
 		_ = cmd.Kill()
 		<-done
+		log.Debug("sing-box process stopped")
 		return nil
 	}
 }

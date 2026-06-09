@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
 )
 
 const (
@@ -43,6 +45,9 @@ func NewClient(httpClient Doer) *Client {
 // FetchLinks выполняет запрос и возвращает список ссылок.
 // Ответ декодируется из base64, каждая строка — отдельная ссылка.
 func (c *Client) FetchLinks(ctx context.Context, url string) ([]string, error) {
+	log := logger.FromContext(ctx)
+	log.Debug("fetching subscription links", "url", url)
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -56,6 +61,7 @@ func (c *Client) FetchLinks(ctx context.Context, url string) ([]string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		log.Warn("subscription returned non-200", "url", url, "status", resp.StatusCode)
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -78,5 +84,6 @@ func (c *Client) FetchLinks(ctx context.Context, url string) ([]string, error) {
 		return nil, fmt.Errorf("scan response: %w", err)
 	}
 
+	log.Debug("subscription response received", "url", url, "status", resp.StatusCode, "links_count", len(links))
 	return links, nil
 }

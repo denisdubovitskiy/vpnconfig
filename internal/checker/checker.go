@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
 	"github.com/denisdubovitskiy/vpnconfig/internal/portgen"
 	"github.com/denisdubovitskiy/vpnconfig/internal/runner"
 	"github.com/denisdubovitskiy/vpnconfig/internal/singbox"
@@ -120,7 +121,18 @@ func defaultHTTPClient() *http.Client {
 }
 
 // CheckLink проверяет одну VPN-ссылку.
-func (c *linkChecker) CheckLink(ctx context.Context, vlessLink string) error {
+func (c *linkChecker) CheckLink(ctx context.Context, vlessLink string) (err error) {
+	log := logger.FromContext(ctx)
+	truncated := truncateURL(vlessLink)
+	log.Info("checking link", "url", truncated)
+	defer func() {
+		if err != nil {
+			log.Warn("link check failed", "url", truncated, "error", err.Error())
+		} else {
+			log.Info("link check passed", "url", truncated)
+		}
+	}()
+
 	timeout := c.cfg.Timeout
 	if timeout == 0 {
 		timeout = defaultCheckTimeout
@@ -143,6 +155,7 @@ func (c *linkChecker) CheckLink(ctx context.Context, vlessLink string) error {
 	if err != nil {
 		return fmt.Errorf("get random port: %w", err)
 	}
+	log.Debug("allocated port for check", "port", port)
 
 	tmpDir := c.cfg.TmpDirectory
 	if tmpDir == "" {
@@ -162,6 +175,7 @@ func (c *linkChecker) CheckLink(ctx context.Context, vlessLink string) error {
 	if err := c.runner.Start(ctx, configPath, port); err != nil {
 		return fmt.Errorf("start sing-box: %w", err)
 	}
+	log.Debug("sing-box started for check", "port", port)
 	defer func() { _ = c.runner.Stop(ctx) }()
 
 	testURLs := c.cfg.URLs
@@ -170,6 +184,7 @@ func (c *linkChecker) CheckLink(ctx context.Context, vlessLink string) error {
 	}
 
 	for _, testURL := range testURLs {
+		log.Debug("testing url through proxy", "test_url", testURL, "port", port)
 		if err := c.checkURL(ctx, testURL, port); err != nil {
 			return fmt.Errorf("check url %s: %w", testURL, err)
 		}
@@ -263,4 +278,13 @@ func (c *linkChecker) injectableClient(proxyURL *url.URL) HttpDoer {
 		Transport: transport,
 		Timeout:   client.Timeout,
 	}
+}
+
+// truncateURL обрезает URL для логирования, оставляя только схему и хост.
+func truncateURL(vpnURL string) string {
+	u, err := url.Parse(vpnURL)
+	if err != nil {
+		return vpnURL
+	}
+	return u.Scheme + "://" + u.Host
 }

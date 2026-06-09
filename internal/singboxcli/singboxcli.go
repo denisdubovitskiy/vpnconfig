@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/denisdubovitskiy/vpnconfig/internal/logger"
 )
 
 // ConfigValidator проверяет валидность конфигурации sing-box.
@@ -37,11 +39,21 @@ func NewCLIChecker(cliPath string, executor CommandExecutor) *CLIChecker {
 
 // CheckConfig проверяет конфигурацию sing-box, вызывая команду check.
 // Формат команды: sing-box --config <path> check
-func (c *CLIChecker) CheckConfig(ctx context.Context, configPath string) error {
+func (c *CLIChecker) CheckConfig(ctx context.Context, configPath string) (err error) {
 	cli := c.cliPath
 	if cli == "" {
 		cli = "sing-box"
 	}
+
+	log := logger.FromContext(ctx)
+	log.Debug("validating sing-box config", "path", configPath, "cli", cli)
+	defer func() {
+		if err != nil {
+			log.Warn("sing-box config validation failed", "path", configPath, "error", err.Error())
+		} else {
+			log.Debug("sing-box config validation passed", "path", configPath)
+		}
+	}()
 
 	args := []string{"--config", configPath, "check"}
 
