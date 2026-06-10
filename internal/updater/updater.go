@@ -312,7 +312,11 @@ func (u *Updater) Run(ctx context.Context, cfg *config.Config) (*Result, error) 
 	// сгенерированные через NewURLTestOutbound outbounds содержат int в поле
 	// tolerance. Без JSON-сравнения это приводит к ложноположительным
 	// "changes detected" при повторных запусках с теми же данными.
-	if outboundsEqual(oldOutbounds, singboxCfg.Outbounds) {
+	equal, err := outboundsEqual(oldOutbounds, singboxCfg.Outbounds)
+	if err != nil {
+		return nil, fmt.Errorf("compare outbounds: %w", err)
+	}
+	if equal {
 		log.Info("no changes detected in sing-box config, skipping save",
 			"reason", "outbounds are identical to previous state",
 		)
@@ -626,14 +630,14 @@ func (u *Updater) saveConfigWithValidation(
 // round-trip) все числа становятся float64, а свежесгенерированные
 // outbounds могут содержать int (например, tolerance в NewURLTestOutbound).
 // reflect.DeepEqual считает int(50) != float64(50), хотя данные идентичны.
-func outboundsEqual(a, b []singbox.Outbound) bool {
+func outboundsEqual(a, b []singbox.Outbound) (bool, error) {
 	aJSON, err := json.Marshal(a)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("marshal outbounds a: %w", err)
 	}
 	bJSON, err := json.Marshal(b)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("marshal outbounds b: %w", err)
 	}
-	return bytes.Equal(aJSON, bJSON)
+	return bytes.Equal(aJSON, bJSON), nil
 }
