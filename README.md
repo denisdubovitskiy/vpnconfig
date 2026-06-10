@@ -499,14 +499,20 @@ time=2026-01-15T14:30:23.106+04:00 level=INFO msg="update completed" changed=tru
 ## Использование
 
 ```bash
-# Запуск
+# Запуск updater
 GOPROXY=direct go run ./cmd/updater/main.go
 
-# Сборка
+# Сборка updater
 make build
 
 # Сборка для роутера (OpenWRT ARM64)
 make build-router
+
+# Проверка VPN-ссылок (checker)
+go run ./cmd/checker/main.go -config checker_config.yaml
+
+# Сборка checker
+make build-checker
 
 # Тесты
 make test
@@ -515,10 +521,81 @@ make test
 make check
 ```
 
+### Checker — проверка VPN-ссылок
+
+Автономный CLI-инструмент для проверки работоспособности VPN-ссылок.
+Поддерживает протоколы VLESS, Trojan, Shadowsocks.
+
+**Использование:**
+
+```bash
+# Быстрая проверка одной ссылки
+./build/checker -vless "vless://uuid@host:443?..."
+
+# Проверка файла со ссылками
+./build/checker -links links.txt
+
+# Проверка через конфигурацию
+./build/checker -config checker_config.yaml
+
+# Комбинирование
+./build/checker -config config.yaml -vless "vless://..."
+```
+
+**Конфигурация (`checker_config.yaml`):**
+
+```yaml
+# sing_box_path: "sing-box"
+# timeout: "10s"
+# test_urls:
+#   - "https://www.gstatic.com/generate_204"
+#   - "https://cp.cloudflare.com"
+
+# Inline ссылки
+# links:
+#   - "vless://uuid@host:443?..."
+
+# Файл со ссылками
+# links_file: "links.txt"
+
+# Одна подписка
+# subscription_url: "https://somevpn.com/s/ID"
+
+# Несколько подписок
+subscription_urls:
+  - "https://server1.com/sub/ID1"
+  - "server2.com/sub/ID2"
+```
+
+**Пример вывода:**
+
+```
+╔══════════════════════════════════════════╗
+║   🔍 VPN Link Checker                   ║
+╚══════════════════════════════════════════╝
+
+  sing-box:  sing-box
+  timeout:   10s
+  test url:  https://www.gstatic.com/generate_204
+
+[1/3] Проверяю vless://uuid@server1:443... ✓ OK
+[2/3] Проверяю vless://uuid@server2:443... ✗ ОШИБКА (timeout)
+[3/3] Проверяю vless://uuid@server3:443... ✓ OK
+
+──────────────────────────────────────────
+  Итого: 3 ссылок
+  ✓ Прошли:  2
+  ✗ Ошибки:  1
+
+  ⚠️  Есть нерабочие ссылки. Проверьте настройки серверов.
+```
+
 ## Архитектура
 
 ```
-cmd/updater/main.go              # Точка входа (инициализация зависимостей)
+cmd/
+├── updater/main.go              # Точка входа updater (инициализация зависимостей)
+└── checker/main.go              # CLI для проверки VPN-ссылок
 internal/
 ├── updater/
 │   ├── updater.go               # Бизнес-логика обновления

@@ -226,8 +226,8 @@ func printBanner() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintf(os.Stderr, "  %ssing-box:%s  %s\n", colorDim, colorReset, checkerSingBox)
 	fmt.Fprintf(os.Stderr, "  %stimeout:%s   %s\n", colorDim, colorReset, checkerTimeout)
-	if len(checkerTestURLs) > 0 {
-		fmt.Fprintf(os.Stderr, "  %stest url:%s %s\n", colorDim, colorReset, checkerTestURLs[0])
+	for _, u := range checkerTestURLs {
+		fmt.Fprintf(os.Stderr, "  %stest url:%s %s\n", colorDim, colorReset, u)
 	}
 	fmt.Fprintln(os.Stderr)
 }
